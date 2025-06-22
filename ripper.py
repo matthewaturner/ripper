@@ -3,11 +3,12 @@ import os
 import csv
 import argparse
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from dotenv import load_dotenv
 
 from sources import YouTubeSource, SpotifySource, SoundCloudSource
 from utils.formatting import format_duration, format_views
+from utils.track_matching import find_best_match
 
 class AudioRipper:
     """Main class for handling audio ripping from multiple sources."""
@@ -200,46 +201,75 @@ def rip_from_csv(args: argparse.Namespace) -> None:
                     print("No results found, skipping...")
                     continue
                 
-                # Try preferred source first
-                if preferred_source in results:
-                    source_results = results[preferred_source]
-                else:
-                    # Fall back to first available source
-                    source, source_results = next(iter(results.items()))
-                    print(f"Preferred source {preferred_source} unavailable, using {source}")
+                # Get Spotify metadata for better matching
+                spotify_ripper = AudioRipper()
+                spotify_data = spotify_ripper.get_source('spotify').search_track(track['artist'], track['song'])
                 
-                if not source_results:
-                    print("No results found in any source, skipping...")
-                    continue
-
-                # Display results
-                print("\nSearch Results:")
-                for idx, result in enumerate(source_results, 1):
-                    if preferred_source == 'youtube':
-                        duration = format_duration(result['duration'])
-                        views = format_views(result['views'])
-                        print(f"\n{idx}. {result['title']}")
-                        print(f"   Channel: {result['channel']}")
-                        print(f"   Duration: {duration} | {views}")
+                # Try auto-matching if we have Spotify data
+                selected = None
+                used_source = preferred_source
+                
+                if spotify_data:
+                    print("Using Spotify metadata for matching...")
+                    # Try preferred source first
+                    if preferred_source in results:
+                        selected = find_best_match(spotify_data, results[preferred_source], preferred_source)
+                        if selected:
+                            print(f"Found good match in {preferred_source}!")
+                    
+                    # If no good match in preferred source, try others
+                    if not selected:
+                        for source, source_results in results.items():
+                            if source != preferred_source:
+                                selected = find_best_match(spotify_data, source_results, source)
+                                if selected:
+                                    used_source = source
+                                    print(f"Found good match in {source}!")
+                                    break
+                
+                # If auto-matching failed or no Spotify data, fall back to manual selection
+                if not selected:
+                    print("\nNo automatic match found, please select manually:")
+                    # Try preferred source first
+                    if preferred_source in results:
+                        source_results = results[preferred_source]
+                        used_source = preferred_source
                     else:
-                        print(f"\n{idx}. {result['title']}")
-                        print(f"   Artist: {result['artist']}")
-                        print(f"   Duration: {result['duration']}s")
+                        # Fall back to first available source
+                        used_source, source_results = next(iter(results.items()))
+                        print(f"Preferred source {preferred_source} unavailable, using {used_source}")
+                    
+                    if not source_results:
+                        print("No results found in any source, skipping...")
+                        continue
 
-                # Get user choice
-                while True:
-                    try:
-                        choice = int(input(f"\nEnter number to download (1-{len(source_results)}): "))
-                        if 1 <= choice <= len(source_results):
-                            break
-                        print(f"Please enter a number between 1 and {len(source_results)}")
-                    except ValueError:
-                        print("Please enter a valid number")
+                    # Display results
+                    print("\nSearch Results:")
+                    for idx, result in enumerate(source_results, 1):
+                        if used_source == 'youtube':
+                            duration = format_duration(result['duration'])
+                            views = format_views(result['views'])
+                            print(f"\n{idx}. {result['title']}")
+                            print(f"   Channel: {result['channel']}")
+                            print(f"   Duration: {duration} | {views}")
+                        else:
+                            print(f"\n{idx}. {result['title']}")
+                            print(f"   Artist: {result['artist']}")
+                            print(f"   Duration: {result['duration']}s")
 
-                # Download the chosen track
-                selected = source_results[choice - 1]
+                    # Get user choice
+                    while True:
+                        try:
+                            choice = int(input(f"\nEnter number to download (1-{len(source_results)}): "))
+                            if 1 <= choice <= len(source_results):
+                                break
+                            print(f"Please enter a number between 1 and {len(source_results)}")
+                        except ValueError:
+                            print("Please enter a valid number")
+
+                    selected = source_results[choice - 1]
                 output_file = ripper.download_track(
-                    preferred_source, 
+                    used_source, 
                     selected['url'],
                     track['artist'],
                     track['song']
