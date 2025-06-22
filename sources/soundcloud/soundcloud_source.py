@@ -2,12 +2,13 @@
 import os
 import json
 import re
+import tempfile
 from typing import List, Dict, Optional
 from pathlib import Path
 import sclib
 import requests
+import m3u8
 from urllib.parse import quote
-from mutagen.mp4 import MP4
 from mutagen.id3 import ID3, TIT2, TPE1
 
 from ..base import AudioSource
@@ -27,18 +28,15 @@ class SoundCloudSource(AudioSource):
             return self._client_id
 
         try:
-            # Get the main page
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
             r = requests.get('https://soundcloud.com', headers=headers)
             if not r.ok:
                 raise Exception("Failed to fetch SoundCloud homepage")
 
-            # Find the scripts containing client_id
             script_urls = re.findall(r'<script crossorigin src="([^"]+)"></script>', r.text)
             
-            # Try each script until we find a client_id
             for script_url in script_urls:
                 if not script_url.startswith('http'):
                     script_url = 'https://soundcloud.com' + script_url
@@ -47,7 +45,6 @@ class SoundCloudSource(AudioSource):
                 if not r.ok:
                     continue
 
-                # Look for client_id
                 client_id_match = re.search(r'client_id:"([^"]+)"', r.text)
                 if client_id_match:
                     self._client_id = client_id_match.group(1)
@@ -62,15 +59,11 @@ class SoundCloudSource(AudioSource):
     def _get_track_info_from_url(self, url: str) -> Optional[Dict]:
         """Get track information from a SoundCloud URL."""
         try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             client_id = self._get_client_id()
             if not client_id:
                 raise Exception("Could not obtain valid client ID")
 
-            # First get the track ID from the URL
             resolve_url = f"https://api-v2.soundcloud.com/resolve?url={url}&client_id={client_id}"
             r = requests.get(resolve_url, headers=headers)
             if not r.ok:
@@ -80,7 +73,6 @@ class SoundCloudSource(AudioSource):
             if not track_data or 'id' not in track_data:
                 raise Exception("Could not get track ID")
             
-            # Then get the full track info
             track_url = f"https://api-v2.soundcloud.com/tracks/{track_data['id']}?client_id={client_id}"
             r = requests.get(track_url, headers=headers)
             if not r.ok:
@@ -99,13 +91,10 @@ class SoundCloudSource(AudioSource):
             if not client_id:
                 raise Exception("Could not obtain valid client ID for search")
             
-            # Search using public API with encoded query
             encoded_query = quote(query)
             url = f"https://api-v2.soundcloud.com/search/tracks?q={encoded_query}&client_id={client_id}&limit={max_results}"
             
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             
             r = requests.get(url, headers=headers)
             if not r.ok:
@@ -130,25 +119,76 @@ class SoundCloudSource(AudioSource):
             print(f"Error searching tracks: {e}")
             return []
 
+    def _download_hls_stream(self, stream_url: str, temp_file: str, headers: dict) -> bool:
+        """Download an HLS stream to a file."""
+        try:
+            # Get the HLS playlist URL
+            r = requests.get(stream_url, headers=headers)
+            if not r.ok:
+                raise Exception(f"Failed to get playlist URL: {r.status_code}")
+
+            playlist_url = r.json().get('url')
+            if not playlist_url:
+                raise Exception("No playlist URL found")
+
+            # Parse the M3U8 playlist
+            playlist = m3u8.load(playlist_url)
+            if not playlist.segments:
+                raise Exception("No segments found in playlist")
+
+            # Download and concatenate all segments
+            with open(temp_file, 'wb') as outfile:
+                for segment in playlist.segments:
+                    r = requests.get(segment.absolute_uri, headers=headers)
+                    if r.ok:
+                        outfile.write(r.content)
+            return True
+
+        except Exception as e:
+            print(f"Error downloading HLS stream: {e}")
+            return False
+
+    def _download_progressive_stream(self, stream_url: str, temp_file: str, headers: dict) -> bool:
+        """Download a progressive stream to a file."""
+        try:
+            r = requests.get(stream_url, headers=headers)
+            if not r.ok:
+                raise Exception(f"Failed to get media URL: {r.status_code}")
+
+            media_url = r.json().get('url')
+            if not media_url:
+                raise Exception("No media URL found")
+
+            r = requests.get(media_url, headers=headers, stream=True)
+            if not r.ok:
+                raise Exception(f"Download failed: {r.status_code}")
+
+            with open(temp_file, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=1024*1024):
+                    if chunk:
+                        f.write(chunk)
+            return True
+
+        except Exception as e:
+            print(f"Error downloading progressive stream: {e}")
+            return False
+
     def download_track(self, url: str, artist: str, song: str, output_path: Optional[str] = None) -> Optional[str]:
         """Download a track from SoundCloud."""
         if output_path is None:
             output_path = self.downloads_dir
 
         try:
-            # Get track info
             track_info = self._get_track_info_from_url(url)
             if not track_info:
                 raise Exception("Could not get track info")
 
-            # Create output filename
             output_filename = f"{song} - {artist}"
             output_filepath = os.path.join(output_path, output_filename)
+            temp_file = f"{output_filepath}.mp3"
             
-            # Download track
             print(f"\nDownloading: {track_info['title']}")
             
-            # Get the stream URL
             client_id = self._get_client_id()
             if not client_id:
                 raise Exception("Could not obtain valid client ID")
@@ -156,48 +196,53 @@ class SoundCloudSource(AudioSource):
             if 'media' not in track_info:
                 raise Exception("No media information found")
 
-            # Get the highest quality MP3 stream URL
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            
+            # Try to get a stream URL, first progressive then HLS
             stream_url = None
+            protocol = None
+
             for transcoding in track_info['media']['transcodings']:
                 if transcoding['format']['protocol'] == 'progressive':
                     stream_url = transcoding['url']
+                    protocol = 'progressive'
                     break
+                elif transcoding['format']['protocol'] == 'hls':
+                    stream_url = transcoding['url']
+                    protocol = 'hls'
 
             if not stream_url:
                 raise Exception("No suitable audio stream found")
 
-            # Get the actual media URL
+            # Add client ID to stream URL
             stream_url = f"{stream_url}?client_id={client_id}"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            
-            r = requests.get(stream_url, headers=headers)
-            if not r.ok:
-                raise Exception(f"Failed to get media URL: {r.status_code}")
-            
-            media_url = r.json()['url']
 
-            # Download the file
-            r = requests.get(media_url, headers=headers, stream=True)
-            if not r.ok:
-                raise Exception(f"Download failed: {r.status_code}")
+            # Download based on protocol
+            success = False
+            if protocol == 'progressive':
+                success = self._download_progressive_stream(stream_url, temp_file, headers)
+            elif protocol == 'hls':
+                success = self._download_hls_stream(stream_url, temp_file, headers)
 
-            temp_file = f"{output_filepath}.mp3"
-            with open(temp_file, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=1024*1024):
-                    if chunk:
-                        f.write(chunk)
-            
+            if not success:
+                raise Exception("Failed to download audio stream")
+
             # Set metadata
             try:
-                audio = ID3(temp_file)
-            except:
-                audio = ID3()
-            audio.add(TIT2(encoding=3, text=song))
-            audio.add(TPE1(encoding=3, text=artist))
-            audio.save(temp_file)
-            
+                # Try to load existing ID3 tag or create new
+                try:
+                    audio = ID3(temp_file)
+                except:
+                    audio = ID3()
+
+                # Set artist and title
+                audio.add(TIT2(encoding=3, text=song))
+                audio.add(TPE1(encoding=3, text=artist))
+                audio.save(temp_file)
+            except Exception as e:
+                print(f"Warning: Could not set metadata: {e}")
+                # Continue anyway since the file is downloaded
+
             print(f"Download complete: {temp_file}")
             return temp_file
 

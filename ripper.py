@@ -9,33 +9,40 @@ from dotenv import load_dotenv
 from sources import YouTubeSource, SpotifySource, SoundCloudSource
 from utils.formatting import format_duration, format_views
 
-# Load environment variables
-load_dotenv()
-
 class AudioRipper:
     """Main class for handling audio ripping from multiple sources."""
     
     def __init__(self):
-        self.sources = {
-            'youtube': YouTubeSource(),
-            'soundcloud': SoundCloudSource(),
-            'spotify': SpotifySource()
+        self.source_classes = {
+            'youtube': YouTubeSource,
+            'soundcloud': SoundCloudSource,
+            'spotify': SpotifySource
         }
+        self.sources = {}  # Initialize empty, load sources on demand
+        
+    def get_source(self, source: str):
+        """Get or initialize a source."""
+        if source not in self.source_classes:
+            raise ValueError(f"Unknown source: {source}")
+            
+        if source not in self.sources:
+            # Load environment variables only when first source is initialized
+            if not self.sources:
+                load_dotenv()
+            self.sources[source] = self.source_classes[source]()
+            
+        return self.sources[source]
 
     def search_source(self, source: str, query: str, max_results: int = 5) -> List[Dict]:
         """Search a specific source for tracks."""
-        if source not in self.sources:
-            print(f"Unknown source: {source}")
-            return []
-            
         try:
-            return self.sources[source].search_tracks(query, max_results)
+            return self.get_source(source).search_tracks(query, max_results)
         except Exception as e:
             print(f"Error searching {source}: {e}")
             return []
 
     def search_all_sources(self, query: str, max_results: int = 5, preferred_source: Optional[str] = None) -> Dict[str, List[Dict]]:
-        """Search across all available sources, prioritizing preferred source."""
+        """Search across available sources, prioritizing preferred source."""
         results = {}
         
         # Try preferred source first if specified
@@ -46,7 +53,7 @@ class AudioRipper:
                 return results  # Return early if preferred source has results
         
         # Search remaining sources
-        for source in self.sources:
+        for source in self.source_classes:
             if source != preferred_source and source != 'spotify':  # Skip Spotify as it's for playlists only
                 source_results = self.search_source(source, query, max_results)
                 if source_results:
@@ -56,11 +63,11 @@ class AudioRipper:
 
     def download_track(self, source: str, url: str, artist: str, song: str) -> Optional[str]:
         """Download a track using the specified source."""
-        if source not in self.sources:
-            print(f"Unknown source: {source}")
+        try:
+            return self.get_source(source).download_track(url, artist, song)
+        except Exception as e:
+            print(f"Error downloading from {source}: {e}")
             return None
-            
-        return self.sources[source].download_track(url, artist, song)
 
 def handle_single_song(args: argparse.Namespace) -> None:
     """Handle single song download."""
@@ -144,7 +151,7 @@ def export_playlist(args: argparse.Namespace) -> None:
     try:
         ripper = AudioRipper()
         print(f"\nFetching playlist: {args.uri}")
-        tracks = ripper.sources['spotify'].get_playlist_tracks(args.uri)
+        tracks = ripper.get_source('spotify').get_playlist_tracks(args.uri)
         
         if not tracks:
             print("No tracks found in playlist")
