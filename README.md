@@ -1,13 +1,20 @@
-# YouTube Audio Ripper
+# Audio Ripper
 
-A simple cross-platform Python application that allows you to search YouTube, view video details, and download audio as MP3.
+A cross-platform Python application that downloads audio from multiple sources (YouTube, SoundCloud) with Spotify playlist support.
 
 ## Features
 
-- Search YouTube videos with detailed metadata (title, channel, duration, views)
-- Display top 5 search results
-- Download audio in MP3 format
+- Multi-source audio downloading:
+  - YouTube with detailed metadata (title, channel, duration, views)
+  - SoundCloud with less rate limiting
+  - Ability to specify preferred source
+  - Automatic fallback if preferred source fails
+- Display top 5 search results from each source
+- Download audio in high-quality MP3/M4A format
 - Save files directly to Downloads folder
+- Export Spotify playlists to CSV
+- Batch download from CSV files
+- Proper audio metadata tagging
 
 ## Prerequisites
 
@@ -26,38 +33,106 @@ A simple cross-platform Python application that allows you to search YouTube, vi
    - **macOS**: `brew install ffmpeg`
    - **Linux**: `sudo apt-get install ffmpeg` (Ubuntu/Debian) or `sudo dnf install ffmpeg` (Fedora)
 
-4. Get a YouTube API key:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select an existing one
-   - Enable the YouTube Data API v3
-   - Create credentials (API key)
-   - Copy your API key
+4. Get Required Credentials:
+   - YouTube:
+     - For search functionality:
+       1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+       2. Create a new project or select an existing one
+       3. Enable the YouTube Data API v3
+       4. Create credentials (API key)
+       5. Copy your API key
+   - Spotify:
+     - Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+     - Create a new application
+     - Get your Client ID and Client Secret
+     - Add http://localhost:8888/callback to Redirect URIs
+   - SoundCloud:
+     - To get your SoundCloud client ID:
+       1. Go to [SoundCloud](https://soundcloud.com) in your browser
+       2. Open Developer Tools (F12)
+       3. Go to the Network tab
+       4. Play any track on SoundCloud
+       5. Look for requests to the API (api-v2.soundcloud.com)
+       6. Find the client_id parameter in the request URL
+       7. Copy this value for your SOUNDCLOUD_CLIENT_ID
 
 5. Set up environment variables:
    - Copy `.env.example` to `.env`
-   - Replace `your_api_key_here` with your actual YouTube API key
+   - Set `YOUTUBE_API_KEY` to your YouTube API key
+   - Set `FFMPEG_PATH` to your FFmpeg installation directory
+   - Set `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to your Spotify credentials
+   - Set `SPOTIFY_REDIRECT_URI` to http://localhost:8888/callback
+   - Set `SOUNDCLOUD_CLIENT_ID` to your SoundCloud client ID
 
 ## Usage
 
-Run the script:
+The script provides several commands:
+
+1. Download a single song:
 ```bash
-python youtube_ripper.py
+# Interactive mode (searches all sources)
+python ripper.py
+
+# Command-line mode with specific source
+python ripper.py song -a "Artist Name" -s "Song Name" --source soundcloud
 ```
 
-Follow the prompts to:
-1. Enter a search term
-2. Select from the search results (1-5)
-3. Wait for the download to complete
+2. Export a Spotify playlist to CSV:
+```bash
+# Get playlist URI by right-clicking playlist in Spotify -> Share -> Copy Spotify URI
+python ripper.py playlist export --uri "spotify:playlist:2L9QwNg7aY7M7Yk3WFyvA8" --output songs.csv
+```
 
-The MP3 file will be saved to your Downloads folder.
+3. Download songs from CSV:
+```bash
+# Use SoundCloud as preferred source (default)
+python ripper.py playlist rip --input songs.csv
+
+# Use YouTube as preferred source
+python ripper.py playlist rip --input songs.csv --source youtube
+```
+
+For single songs, the script will:
+1. Search across enabled sources (YouTube, SoundCloud)
+2. Show search results with metadata from each source
+3. Let you choose which version to download
+4. Download and convert to audio file
+5. Set proper metadata (artist and title)
+6. Save as "song - artist.m4a" or "song - artist.mp3" (preferring m4a when available)
+
+For playlists:
+1. Export command saves playlist tracks to CSV with:
+   - Artist name
+   - Song title
+   - Album name
+   - Release year
+   - Duration
+
+2. Rip command processes the CSV and:
+   - Automatically searches for each song on preferred source
+   - Falls back to other sources if preferred source fails
+   - Downloads the best match
+   - Sets proper metadata
+   - Names files consistently
+
+All audio files are saved to your Downloads folder.
+
+## Source Priority
+
+By default, the script now prefers SoundCloud over YouTube when ripping from CSV, as it's less prone to rate limiting. You can override this with the --source flag.
+
+When downloading individual songs, results from all available sources are shown, and you can choose which version to download.
 
 ## Future Improvements
 
 - AI-powered metadata generation for artist, title, album, key, etc.
-- Batch downloading
+- Additional audio sources
 - Custom output directory selection
 - Audio quality options
+- Smart matching algorithms for better search results
+- Playlist creation from text files
+- More granular source preferences
 
 ## Legal Notice
 
-This tool is for personal use only. Please respect copyright laws and YouTube's terms of service.
+This tool is for personal use only. Please respect copyright laws and the terms of service of all platforms.
