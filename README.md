@@ -79,8 +79,15 @@ python ripper.py song -a "Artist Name" -s "Song Name" --source soundcloud
 
 2. Export a Spotify playlist to CSV:
 ```bash
-# Get playlist URI by right-clicking playlist in Spotify -> Share -> Copy Spotify URI
-python ripper.py playlist export --uri "spotify:playlist:2L9QwNg7aY7M7Yk3WFyvA8" --output songs.csv
+# Three ways to specify the playlist:
+# 1. Spotify URI (right-click playlist -> Share -> Copy Spotify URI)
+python ripper.py playlist export --uri "spotify:playlist:37i9dQZF1DWWQRwui0ExPn" --output songs.csv
+
+# 2. Spotify URL (copy from browser)
+python ripper.py playlist export --uri "https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn?si=..." --output songs.csv
+
+# 3. Just the playlist ID
+python ripper.py playlist export --uri "37i9dQZF1DWWQRwui0ExPn" --output songs.csv
 ```
 
 3. Download songs from CSV:

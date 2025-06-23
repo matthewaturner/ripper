@@ -35,10 +35,20 @@ class SpotifySource:
             List of track information dictionaries
         """
         try:
-            if ':' in playlist_uri:
+            # Handle different formats:
+            # 1. URI format: spotify:playlist:37i9dQZF1DWWQRwui0ExPn
+            # 2. URL format: https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn?si=...
+            # 3. Direct ID: 37i9dQZF1DWWQRwui0ExPn
+            
+            if playlist_uri.startswith('http'):
+                # Extract ID from URL
+                playlist_id = playlist_uri.split('playlist/')[1].split('?')[0]
+            elif ':' in playlist_uri:
+                # Extract ID from URI
                 playlist_id = playlist_uri.split(':')[-1]
             else:
-                playlist_id = playlist_uri  # Assume it's already an ID
+                # Assume it's already an ID
+                playlist_id = playlist_uri
 
             tracks = []
             results = self.sp.playlist_tracks(playlist_id)
