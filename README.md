@@ -29,7 +29,7 @@ A cross-platform Python application that downloads audio from multiple sources (
    pip install -r requirements.txt
    ```
 3. Install FFmpeg:
-   - **Windows**: Download from [FFmpeg website](https://ffmpeg.org/download.html) and add to PATH
+   - **Windows**: Download from [FFmpeg website](https://ffmpeg.org/download.html)
    - **macOS**: `brew install ffmpeg`
    - **Linux**: `sudo apt-get install ffmpeg` (Ubuntu/Debian) or `sudo dnf install ffmpeg` (Fedora)
 
