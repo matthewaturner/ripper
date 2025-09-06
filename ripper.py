@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 from sources import YouTubeSource, SpotifySource, SoundCloudSource
 from utils.formatting import format_duration, format_views
-from utils.track_matching import find_best_match, parse_duration
+from utils.track_matching import find_best_match
 
 class AudioRipper:
     """Main class for handling audio ripping from multiple sources."""
@@ -147,6 +147,10 @@ def export_playlist(args: argparse.Namespace) -> None:
         print("Please provide a Spotify playlist URI (format: spotify:playlist:ID)")
         return
     
+    if not args.output:
+        print("Please provide an output CSV file path")
+        return
+    
     try:
         ripper = AudioRipper()
         print(f"\nFetching playlist: {args.uri}")
@@ -156,26 +160,12 @@ def export_playlist(args: argparse.Namespace) -> None:
             print("No tracks found in playlist")
             return
         
-        # Use default Downloads folder, same as where songs are downloaded
-        downloads_dir = str(Path.home() / "Downloads")
-        
-        # Create filename from playlist URI if no output specified
-        if args.output:
-            # If user provides output, save it to Downloads folder
-            output_filename = Path(args.output).name
-        else:
-            # Extract playlist ID from URI for filename
-            playlist_id = args.uri.split(':')[-1]
-            output_filename = f"playlist_{playlist_id}.csv"
-        
-        output_path = os.path.join(downloads_dir, output_filename)
-        
-        with open(output_path, 'w', newline='', encoding='utf-8') as f:
+        with open(args.output, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['artist', 'song', 'album', 'year', 'duration'])
             writer.writeheader()
             writer.writerows(tracks)
         
-        print(f"\nExported {len(tracks)} tracks to {output_path}")
+        print(f"\nExported {len(tracks)} tracks to {args.output}")
         
     except Exception as e:
         print(f"Error exporting playlist: {e}")
@@ -185,21 +175,16 @@ def rip_from_csv(args: argparse.Namespace) -> None:
     if not args.input:
         print("Please provide an input CSV file")
         return
-
-    # Use default Downloads folder, same as where songs are downloaded
-    downloads_dir = str(Path.home() / "Downloads")
-    csv_path = os.path.join(downloads_dir, args.input)
     
-    if not os.path.exists(csv_path):
+    if not os.path.exists(args.input):
         print(f"CSV file not found: {args.input}")
         return
-
     
     ripper = AudioRipper()
     preferred_source = args.source if args.source else 'soundcloud'  # Default to SoundCloud
     
     try:
-        with open(csv_path, 'r', encoding='utf-8') as f:
+        with open(args.input, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             total_tracks = sum(1 for _ in reader)  # Count rows
             f.seek(0)  # Reset file pointer
@@ -246,66 +231,45 @@ def rip_from_csv(args: argparse.Namespace) -> None:
                 
                 # If auto-matching failed or no Spotify data, fall back to manual selection
                 if not selected:
-                    print("\nNo automatic match found, searching all available sources...")
+                    print("\nNo automatic match found, please select manually:")
+                    # Try preferred source first
+                    if preferred_source in results:
+                        source_results = results[preferred_source]
+                        used_source = preferred_source
+                    else:
+                        # Fall back to first available source
+                        used_source, source_results = next(iter(results.items()))
+                        print(f"Preferred source {preferred_source} unavailable, using {used_source}")
                     
-                    # Display Spotify metadata to help user choose
-                    if spotify_data:
-                        print(f"\nSpotify Reference:")
-                        print(f"   Title: {spotify_data['song']}")
-                        print(f"   Artist: {spotify_data['artist']}")
-                        if spotify_data.get('album'):
-                            print(f"   Album: {spotify_data['album']}")
-                        if spotify_data.get('duration'):
-                            duration_seconds = parse_duration(spotify_data['duration'])
-                            duration_formatted = format_duration(f"PT{duration_seconds}S")
-                            print(f"   Duration: {duration_formatted}")
-                    
-                    # Display results from all available sources
-                    print("\nSearch Results:")
-                    total_results = 0
-                    result_map = {}  # Map result numbers to (source, result) pairs
-                    
-                    for source, source_results in results.items():
-                        if source_results:
-                            print(f"\n{source.upper()} RESULTS:")
-                            for result in source_results:
-                                total_results += 1
-                                if source == 'youtube':
-                                    duration = format_duration(result['duration'])
-                                    views = format_views(result['views'])
-                                    print(f"\n{total_results}. {result['title']}")
-                                    print(f"   Channel: {result['channel']}")
-                                    print(f"   Duration: {duration} | {views}")
-                                elif source == 'soundcloud':
-                                    print(f"\n{total_results}. {result['title']}")
-                                    print(f"   Artist: {result['artist']}")
-                                    print(f"   Duration: {result['duration']}s | Likes: {result['likes']}")
-                                    if result.get('genre'):
-                                        print(f"   Genre: {result['genre']}")
-                                result_map[total_results] = (source, result)
-                    
-                    if total_results == 0:
+                    if not source_results:
                         print("No results found in any source, skipping...")
                         continue
 
+                    # Display results
+                    print("\nSearch Results:")
+                    for idx, result in enumerate(source_results, 1):
+                        if used_source == 'youtube':
+                            duration = format_duration(result['duration'])
+                            views = format_views(result['views'])
+                            print(f"\n{idx}. {result['title']}")
+                            print(f"   Channel: {result['channel']}")
+                            print(f"   Duration: {duration} | {views}")
+                        else:
+                            print(f"\n{idx}. {result['title']}")
+                            print(f"   Artist: {result['artist']}")
+                            print(f"   Duration: {result['duration']}s")
+
                     # Get user choice
-                    print("\n0. Skip this track (no good match)")
                     while True:
                         try:
-                            choice = int(input(f"\nEnter number to download (0 to skip, 1-{total_results}): "))
-                            if 0 <= choice <= total_results:
+                            choice = int(input(f"\nEnter number to download (1-{len(source_results)}): "))
+                            if 1 <= choice <= len(source_results):
                                 break
-                            print(f"Please enter a number between 0 and {total_results}")
+                            print(f"Please enter a number between 1 and {len(source_results)}")
                         except ValueError:
                             print("Please enter a valid number")
 
-                    # Handle user choice
-                    if choice == 0:
-                        print("Skipping track...")
-                        continue
-                    
-                    # Get the chosen result and its source
-                    used_source, selected = result_map[choice]
+                    selected = source_results[choice - 1]
                 output_file = ripper.download_track(
                     used_source, 
                     selected['url'],
@@ -339,7 +303,7 @@ def main():
     
     export_parser = playlist_subparsers.add_parser('export', help='Export Spotify playlist to CSV')
     export_parser.add_argument('--uri', help='Spotify playlist URI (spotify:playlist:ID)')
-    export_parser.add_argument('--output', help='Output CSV filename (optional, will be saved to Downloads folder)')
+    export_parser.add_argument('--output', help='Output CSV file path')
     
     rip_parser = playlist_subparsers.add_parser('rip', help='Download songs from CSV')
     rip_parser.add_argument('--input', help='Input CSV file path')
