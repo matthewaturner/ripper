@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """Audio Ripper CLI with support for multiple sources."""
 import os
 import csv
