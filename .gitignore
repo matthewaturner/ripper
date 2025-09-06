@@ -1,5 +1,12 @@
+# folders
 __pycache__/
-*.pyc
-.env
 venv/
+
+# files
+.env
 .cache
+
+# file types
+*.pyc
+*.csv
+
