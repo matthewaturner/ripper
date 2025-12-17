@@ -48,16 +48,9 @@ class AudioRipper:
         """Search across available sources, prioritizing preferred source."""
         results = {}
         
-        # Try preferred source first if specified
-        if preferred_source:
-            source_results = self.search_source(preferred_source, query, max_results)
-            if source_results:
-                results[preferred_source] = source_results
-                return results  # Return early if preferred source has results
-        
-        # Search remaining sources
+        # Search all sources (except Spotify which is for playlists only)
         for source in self.source_classes:
-            if source != preferred_source and source != 'spotify':  # Skip Spotify as it's for playlists only
+            if source != 'spotify':  # Skip Spotify as it's for playlists only
                 source_results = self.search_source(source, query, max_results)
                 if source_results:
                     results[source] = source_results
@@ -108,13 +101,14 @@ def handle_single_song(args: argparse.Namespace) -> None:
                 if source == 'youtube':
                     duration = format_duration(result['duration'])
                     views = format_views(result['views'])
-                    print(f"\n{total_results}. {result['title']}")
+                    print(f"\n{total_results}. [{source.upper()}] {result['title']}")
                     print(f"   Channel: {result['channel']}")
                     print(f"   Duration: {duration} | {views}")
                 elif source == 'soundcloud':
-                    print(f"\n{total_results}. {result['title']}")
+                    duration = format_duration(result['duration'])
+                    print(f"\n{total_results}. [{source.upper()}] {result['title']}")
                     print(f"   Artist: {result['artist']}")
-                    print(f"   Duration: {result['duration']}s | Likes: {result['likes']}")
+                    print(f"   Duration: {duration} | Likes: {result['likes']}")
                     if result.get('genre'):
                         print(f"   Genre: {result['genre']}")
                 result_map[total_results] = (source, result)
@@ -122,10 +116,13 @@ def handle_single_song(args: argparse.Namespace) -> None:
     # Get user choice
     while True:
         try:
-            choice = int(input(f"\nEnter number to download (1-{total_results}): "))
+            choice = int(input(f"\nEnter number to download (1-{total_results}, or -1 to skip): "))
+            if choice == -1:
+                print("Skipping download...")
+                return
             if 1 <= choice <= total_results:
                 break
-            print(f"Please enter a number between 1 and {total_results}")
+            print(f"Please enter a number between 1 and {total_results}, or -1 to skip")
         except ValueError:
             print("Please enter a valid number")
 
@@ -161,7 +158,8 @@ def export_playlist(args: argparse.Namespace) -> None:
             return
         
         with open(args.output, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=['artist', 'song', 'album', 'year', 'duration'])
+            writer = csv.DictWriter(f, fieldnames=['artist', 'song', 'album', 'year', 'duration'], 
+                                   quoting=csv.QUOTE_MINIMAL)
             writer.writeheader()
             writer.writerows(tracks)
         
@@ -232,44 +230,60 @@ def rip_from_csv(args: argparse.Namespace) -> None:
                 # If auto-matching failed or no Spotify data, fall back to manual selection
                 if not selected:
                     print("\nNo automatic match found, please select manually:")
-                    # Try preferred source first
-                    if preferred_source in results:
-                        source_results = results[preferred_source]
-                        used_source = preferred_source
-                    else:
-                        # Fall back to first available source
-                        used_source, source_results = next(iter(results.items()))
-                        print(f"Preferred source {preferred_source} unavailable, using {used_source}")
                     
-                    if not source_results:
+                    # Display Spotify track info if available
+                    if spotify_data:
+                        spotify_duration = format_duration(spotify_data['duration'])
+                        print(f"\nSpotify Track Info:")
+                        print(f"   {spotify_data['artist']} - {spotify_data['song']}")
+                        print(f"   Duration: {spotify_duration}")
+                    
+                    # Display results from all sources
+                    print("\nSearch Results:")
+                    total_results = 0
+                    result_map = {}  # Map result numbers to (source, result) pairs
+                    
+                    for source, source_results in results.items():
+                        if source_results:
+                            print(f"\n{source.upper()} RESULTS:")
+                            for result in source_results:
+                                total_results += 1
+                                if source == 'youtube':
+                                    duration = format_duration(result['duration'])
+                                    views = format_views(result['views'])
+                                    print(f"\n{total_results}. [{source.upper()}] {result['title']}")
+                                    print(f"   Channel: {result['channel']}")
+                                    print(f"   Duration: {duration} | {views}")
+                                elif source == 'soundcloud':
+                                    duration = format_duration(result['duration'])
+                                    print(f"\n{total_results}. [{source.upper()}] {result['title']}")
+                                    print(f"   Artist: {result['artist']}")
+                                    print(f"   Duration: {duration} | Likes: {result['likes']}")
+                                    if result.get('genre'):
+                                        print(f"   Genre: {result['genre']}")
+                                result_map[total_results] = (source, result)
+                    
+                    if total_results == 0:
                         print("No results found in any source, skipping...")
                         continue
-
-                    # Display results
-                    print("\nSearch Results:")
-                    for idx, result in enumerate(source_results, 1):
-                        if used_source == 'youtube':
-                            duration = format_duration(result['duration'])
-                            views = format_views(result['views'])
-                            print(f"\n{idx}. {result['title']}")
-                            print(f"   Channel: {result['channel']}")
-                            print(f"   Duration: {duration} | {views}")
-                        else:
-                            print(f"\n{idx}. {result['title']}")
-                            print(f"   Artist: {result['artist']}")
-                            print(f"   Duration: {result['duration']}s")
 
                     # Get user choice
                     while True:
                         try:
-                            choice = int(input(f"\nEnter number to download (1-{len(source_results)}): "))
-                            if 1 <= choice <= len(source_results):
+                            choice = int(input(f"\nEnter number to download (1-{total_results}, or -1 to skip): "))
+                            if choice == -1:
+                                print("Skipping this track...")
+                                selected = None
                                 break
-                            print(f"Please enter a number between 1 and {len(source_results)}")
+                            if 1 <= choice <= total_results:
+                                used_source, selected = result_map[choice]
+                                break
+                            print(f"Please enter a number between 1 and {total_results}, or -1 to skip")
                         except ValueError:
                             print("Please enter a valid number")
-
-                    selected = source_results[choice - 1]
+                    
+                    if not selected:
+                        continue
                 output_file = ripper.download_track(
                     used_source, 
                     selected['url'],

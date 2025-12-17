@@ -46,8 +46,11 @@ def partial_similarity_ratio(s1: str, s2: str) -> float:
     return best_ratio * 100
 
 
-def parse_duration(duration: str) -> int:
+def parse_duration(duration) -> int:
     """Convert various duration formats to seconds."""
+    if duration is None:
+        return 0
+    
     if isinstance(duration, int):
         return duration
     
