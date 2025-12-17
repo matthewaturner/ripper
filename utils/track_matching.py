@@ -1,8 +1,50 @@
 """Utilities for matching tracks between sources."""
 from typing import Dict, List, Optional
-from thefuzz import fuzz
+import difflib
 import re
 import isodate
+
+
+def similarity_ratio(s1: str, s2: str) -> float:
+    """Calculate similarity ratio between two strings (0-100).
+    
+    Uses difflib.SequenceMatcher as a pure Python alternative to Levenshtein distance.
+    Returns a value between 0 (no match) and 100 (perfect match).
+    """
+    return difflib.SequenceMatcher(None, s1, s2).ratio() * 100
+
+
+def partial_similarity_ratio(s1: str, s2: str) -> float:
+    """Calculate partial similarity ratio (0-100).
+    
+    Finds the best matching substring. Similar to fuzz.partial_ratio.
+    Returns a value between 0 (no match) and 100 (perfect match).
+    """
+    if len(s1) <= len(s2):
+        shorter, longer = s1, s2
+    else:
+        shorter, longer = s2, s1
+    
+    # Find the best matching substring
+    matcher = difflib.SequenceMatcher(None, shorter, longer)
+    best_ratio = 0.0
+    
+    # If shorter string is empty, return 0
+    if not shorter:
+        return 0.0
+    
+    # Try matching the shorter string against all substrings of the longer string
+    for i in range(len(longer) - len(shorter) + 1):
+        substring = longer[i:i + len(shorter)]
+        ratio = difflib.SequenceMatcher(None, shorter, substring).ratio()
+        best_ratio = max(best_ratio, ratio)
+    
+    # Also check the full string comparison
+    full_ratio = difflib.SequenceMatcher(None, shorter, longer).ratio()
+    best_ratio = max(best_ratio, full_ratio)
+    
+    return best_ratio * 100
+
 
 def parse_duration(duration: str) -> int:
     """Convert various duration formats to seconds."""
@@ -74,7 +116,7 @@ def score_match(spotify_data: Dict, result: Dict, source: str) -> float:
     spotify_title = clean_title(spotify_data['song'])
     result_title = clean_title(result['title'])
     
-    title_ratio = fuzz.ratio(spotify_title, result_title) / 100
+    title_ratio = similarity_ratio(spotify_title, result_title) / 100
     score += title_ratio
     
     # 3. Artist match (max 1 point)
@@ -84,14 +126,14 @@ def score_match(spotify_data: Dict, result: Dict, source: str) -> float:
         # For YouTube, check both title and channel
         channel = result['channel'].lower()
         # Check if artist appears in channel name
-        channel_ratio = fuzz.partial_ratio(spotify_artist, channel) / 100
+        channel_ratio = partial_similarity_ratio(spotify_artist, channel) / 100
         # Also check if artist appears in title
-        title_artist_ratio = fuzz.partial_ratio(spotify_artist, result_title) / 100
+        title_artist_ratio = partial_similarity_ratio(spotify_artist, result_title) / 100
         # Use the better of the two scores
         score += max(channel_ratio, title_artist_ratio)
     else:  # SoundCloud
         result_artist = result['artist'].lower()
-        artist_ratio = fuzz.ratio(spotify_artist, result_artist) / 100
+        artist_ratio = similarity_ratio(spotify_artist, result_artist) / 100
         score += artist_ratio
     
     # 4. Additional source-specific scoring (max 1 point)
