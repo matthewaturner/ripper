@@ -6,6 +6,7 @@ Download audio from YouTube, SoundCloud, or Spotify playlists.
 
 - Python 3.6+
 - FFmpeg
+- JavaScript runtime (required for yt-dlp) - Deno recommended
 
 ## Installation
 
@@ -18,6 +19,16 @@ Download audio from YouTube, SoundCloud, or Spotify playlists.
    - **macOS**: `brew install ffmpeg`
    - **Linux**: `sudo apt-get install ffmpeg`
    - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+
+3. Install a JavaScript runtime (Deno recommended):
+   - **macOS/Linux**: 
+     ```bash
+     curl -fsSL https://deno.land/install.sh | sh
+     ```
+   - **Windows**: 
+     ```powershell
+     irm https://deno.land/install.ps1 | iex
+     ```
 
 ## Credentials
 
