@@ -48,6 +48,9 @@ def partial_similarity_ratio(s1: str, s2: str) -> float:
 
 def parse_duration(duration: str) -> int:
     """Convert various duration formats to seconds."""
+    if duration is None:
+        return 0
+        
     if isinstance(duration, int):
         return duration
     
@@ -143,7 +146,7 @@ def score_match(spotify_data: Dict, result: Dict, source: str) -> float:
             views = int(result['views'])
             view_score = min(1.0, views / 1000000)  # Max at 1M views
             score += view_score
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, TypeError):
             pass
     elif source == 'soundcloud':
         # Prefer tracks with more likes
@@ -151,7 +154,7 @@ def score_match(spotify_data: Dict, result: Dict, source: str) -> float:
             likes = int(result['likes'])
             like_score = min(1.0, likes / 10000)  # Max at 10K likes
             score += like_score
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, TypeError):
             pass
             
         # Bonus for genre match if available

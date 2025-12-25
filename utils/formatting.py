@@ -45,12 +45,17 @@ def format_duration(duration) -> str:
 
 def format_views(views: str) -> str:
     """Format view count to be more readable."""
-    views_int = int(views)
-    if views_int >= 1_000_000:
-        return f"{views_int/1_000_000:.1f}M views"
-    elif views_int >= 1_000:
-        return f"{views_int/1_000:.1f}K views"
-    return f"{views_int} views"
+    if views is None:
+        return "Unknown views"
+    try:
+        views_int = int(views)
+        if views_int >= 1_000_000:
+            return f"{views_int/1_000_000:.1f}M views"
+        elif views_int >= 1_000:
+            return f"{views_int/1_000:.1f}K views"
+        return f"{views_int} views"
+    except (ValueError, TypeError):
+        return "Unknown views"
 
 def format_track_info(track: Dict) -> Dict:
     """Format track information into a standardized format."""

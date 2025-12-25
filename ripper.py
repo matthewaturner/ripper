@@ -2,7 +2,6 @@
 
 """Audio Ripper CLI with support for multiple sources."""
 import os
-import csv
 import argparse
 import subprocess
 import tempfile
@@ -193,18 +192,16 @@ def handle_single_song(args: argparse.Namespace) -> None:
     else:
         print("\nFailed to download audio")
 
-def export_playlist(args: argparse.Namespace) -> None:
-    """Export Spotify playlist to CSV."""
+def download_playlist(args: argparse.Namespace) -> None:
+    """Download all songs from a Spotify playlist."""
     if not args.uri:
         print("Please provide a Spotify playlist URI (format: spotify:playlist:ID)")
         return
     
-    if not args.output:
-        print("Please provide an output CSV file path")
-        return
+    ripper = AudioRipper()
+    preferred_source = args.source if args.source else 'soundcloud'  # Default to SoundCloud
     
     try:
-        ripper = AudioRipper()
         print(f"\nFetching playlist: {args.uri}")
         tracks = ripper.get_source('spotify').get_playlist_tracks(args.uri)
         
@@ -212,42 +209,23 @@ def export_playlist(args: argparse.Namespace) -> None:
             print("No tracks found in playlist")
             return
         
-        with open(args.output, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=['artist', 'song', 'album', 'year', 'duration'])
-            writer.writeheader()
-            writer.writerows(tracks)
+        total_tracks = len(tracks)
+        print(f"Found {total_tracks} tracks in playlist\n")
         
-        print(f"\nExported {len(tracks)} tracks to {args.output}")
-        
-    except Exception as e:
-        print(f"Error exporting playlist: {e}")
-
-def rip_from_csv(args: argparse.Namespace) -> None:
-    """Download songs from CSV file."""
-    if not args.input:
-        print("Please provide an input CSV file")
-        return
-    
-    if not os.path.exists(args.input):
-        print(f"CSV file not found: {args.input}")
-        return
-    
-    ripper = AudioRipper()
-    preferred_source = args.source if args.source else 'soundcloud'  # Default to SoundCloud
-    
-    try:
-        with open(args.input, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            total_tracks = sum(1 for _ in reader)  # Count rows
-            f.seek(0)  # Reset file pointer
-            next(reader)  # Skip header row
-            
-            for i, track in enumerate(reader, 1):
+        for i, track in enumerate(tracks, 1):
                 print(f"\nProcessing track {i}/{total_tracks}")
                 print(f"Artist: {track['artist']}")
                 print(f"Song: {track['song']}")
+                                # Check if file already exists
+                expected_filename = f"{track['song']} - {track['artist']}.mp3"
+                downloads_dir = str(Path.home() / "Downloads")
+                expected_path = os.path.join(downloads_dir, expected_filename)
                 
-                # Search for the song
+                if os.path.exists(expected_path):
+                    print(f"File already exists, skipping: {expected_filename}")
+                    print("\n" + "-"*50)
+                    continue
+                                # Search for the song
                 query = f"{track['artist']} - {track['song']}"
                 results = ripper.search_all_sources(query, preferred_source=preferred_source)
                 
@@ -358,7 +336,7 @@ def rip_from_csv(args: argparse.Namespace) -> None:
                 print("\n" + "-"*50)  # Separator between tracks
                 
     except Exception as e:
-        print(f"Error processing CSV: {e}")
+        print(f"Error processing playlist: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description='Audio Ripper with multiple source support')
@@ -370,18 +348,11 @@ def main():
     song_parser.add_argument('-s', '--song', help='Song name')
     song_parser.add_argument('--source', choices=['youtube', 'soundcloud'], help='Preferred source')
     
-    # Playlist export
-    playlist_export_parser = subparsers.add_parser('playlist', help='Playlist operations')
-    playlist_subparsers = playlist_export_parser.add_subparsers(dest='playlist_command', help='Playlist commands')
-    
-    export_parser = playlist_subparsers.add_parser('export', help='Export Spotify playlist to CSV')
-    export_parser.add_argument('--uri', help='Spotify playlist URI (spotify:playlist:ID)')
-    export_parser.add_argument('--output', help='Output CSV file path')
-    
-    rip_parser = playlist_subparsers.add_parser('rip', help='Download songs from CSV')
-    rip_parser.add_argument('--input', help='Input CSV file path')
-    rip_parser.add_argument('--source', choices=['youtube', 'soundcloud'], 
-                           help='Preferred source (default: soundcloud)')
+    # Playlist download
+    playlist_parser = subparsers.add_parser('playlist', help='Download all songs from a Spotify playlist')
+    playlist_parser.add_argument('--uri', required=True, help='Spotify playlist URI (spotify:playlist:ID)')
+    playlist_parser.add_argument('--source', choices=['youtube', 'soundcloud'], 
+                                help='Preferred source (default: soundcloud)')
     
     args = parser.parse_args()
     
@@ -391,12 +362,7 @@ def main():
     elif args.command == 'song':
         handle_single_song(args)
     elif args.command == 'playlist':
-        if args.playlist_command == 'export':
-            export_playlist(args)
-        elif args.playlist_command == 'rip':
-            rip_from_csv(args)
-        else:
-            print("Please specify a playlist command (export or rip)")
+        download_playlist(args)
     else:
         parser.print_help()
 
