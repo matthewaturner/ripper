@@ -59,10 +59,14 @@ def format_views(views: str) -> str:
 
 def format_track_info(track: Dict) -> Dict:
     """Format track information into a standardized format."""
-    return {
+    formatted = {
         'artist': track.get('artist', ''),
         'song': track.get('song', ''),
         'album': track.get('album', ''),
         'year': track.get('year', ''),
         'duration': track.get('duration', 0)  # Duration in seconds
     }
+    # Include spotify_track_id if present
+    if 'spotify_track_id' in track:
+        formatted['spotify_track_id'] = track['spotify_track_id']
+    return formatted

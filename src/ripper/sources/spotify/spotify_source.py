@@ -62,7 +62,8 @@ class SpotifySource:
                             'song': track['name'],
                             'album': track['album']['name'],
                             'year': track['album']['release_date'][:4],
-                            'duration': track['duration_ms'] // 1000  # Convert to seconds
+                            'duration': track['duration_ms'] // 1000,  # Convert to seconds
+                            'spotify_track_id': track['id']
                         }
                         tracks.append(format_track_info(track_info))
                 
@@ -95,7 +96,8 @@ class SpotifySource:
                     'song': track['name'],
                     'album': track['album']['name'],
                     'year': track['album']['release_date'][:4],
-                    'duration': track['duration_ms'] // 1000
+                    'duration': track['duration_ms'] // 1000,
+                    'spotify_track_id': track['id']
                 }
                 return format_track_info(track_info)
             return None

@@ -19,7 +19,7 @@ class AudioSource(ABC):
         pass
     
     @abstractmethod
-    def download_track(self, url: str, artist: str, song: str, output_path: Optional[str] = None) -> Optional[str]:
+    def download_track(self, url: str, artist: str, song: str, output_path: Optional[str] = None, spotify_track_id: Optional[str] = None) -> Optional[str]:
         """Download a track from the source.
         
         Args:
@@ -27,6 +27,7 @@ class AudioSource(ABC):
             artist: Artist name for metadata
             song: Song title for metadata
             output_path: Optional path to save the file to
+            spotify_track_id: Optional Spotify track ID to include in filename
             
         Returns:
             Path to the downloaded file if successful, None otherwise

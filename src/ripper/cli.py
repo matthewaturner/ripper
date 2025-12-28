@@ -3,7 +3,7 @@
 """Audio Ripper CLI with support for multiple sources."""
 import argparse
 
-from ripper.workflows import SingleSongWorkflow, PlaylistWorkflow
+from ripper.workflows import SingleSongWorkflow, PlaylistWorkflow, RenameFilesWorkflow
 
 
 def main():
@@ -27,6 +27,10 @@ def main():
                                 help='Preferred source (default: soundcloud)')
     playlist_parser.add_argument('--output-dir', help='Directory to save downloaded files (default: ~/Downloads)')
     
+    # Rename files to include Spotify track IDs
+    rename_parser = subparsers.add_parser('rename', help='Rename existing files to include Spotify track IDs')
+    rename_parser.add_argument('--directory', help='Directory containing files to rename (default: ~/Downloads)')
+    
     args = parser.parse_args()
     
     # Route to appropriate workflow
@@ -35,6 +39,9 @@ def main():
         workflow.run(args)
     elif args.command == 'playlist':
         workflow = PlaylistWorkflow(downloads_dir=getattr(args, 'output_dir', None))
+        workflow.run(args)
+    elif args.command == 'rename':
+        workflow = RenameFilesWorkflow()
         workflow.run(args)
     else:
         parser.print_help()

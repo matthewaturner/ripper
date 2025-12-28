@@ -1,13 +1,17 @@
 """Workflow implementations for single song and playlist downloads."""
 import argparse
+import os
+import re
 from typing import Optional
+from dotenv import load_dotenv
 
 from ripper.sources import AudioRipper
+from ripper.sources.spotify.spotify_source import SpotifySource
 from ripper.audio_processing import reencode_mp3
 from ripper.file_manager import file_exists, get_expected_filepath
 from ripper.ui import display_search_results, display_spotify_track_info, get_user_choice
 from ripper.utils.track_matching import find_best_match
-from ripper.config import DEFAULT_PLAYLIST_SOURCE
+from ripper.config import DEFAULT_PLAYLIST_SOURCE, DOWNLOADS_DIR
 
 
 class SingleSongWorkflow:
@@ -129,8 +133,12 @@ class PlaylistWorkflow:
         print(f"Song: {track['song']}")
         
         # Check if file already exists
-        if file_exists(track['artist'], track['song'], self.downloads_dir):
-            filename = f"{track['song']} - {track['artist']}.mp3"
+        spotify_track_id = track.get('spotify_track_id')
+        if file_exists(track['artist'], track['song'], self.downloads_dir, spotify_track_id):
+            if spotify_track_id:
+                filename = f"{track['song']} - {track['artist']} {{{spotify_track_id}}}.mp3"
+            else:
+                filename = f"{track['song']} - {track['artist']}.mp3"
             print(f"File already exists, skipping: {filename}")
             print("\n" + "-"*50)
             return
@@ -156,7 +164,8 @@ class PlaylistWorkflow:
             used_source, 
             selected['url'],
             track['artist'],
-            track['song']
+            track['song'],
+            spotify_track_id=spotify_track_id
         )
         
         if output_file:
@@ -250,3 +259,93 @@ class PlaylistWorkflow:
         
         used_source, selected = result_map[choice]
         return selected, used_source
+
+
+class RenameFilesWorkflow:
+    """Handles renaming existing files to include Spotify track IDs."""
+    
+    def __init__(self):
+        load_dotenv()
+        self.spotify = SpotifySource()
+    
+    def run(self, args: argparse.Namespace) -> None:
+        """Execute file renaming workflow.
+        
+        Args:
+            args: Parsed command line arguments with 'directory' attribute
+        """
+        directory = args.directory if hasattr(args, 'directory') and args.directory else DOWNLOADS_DIR
+        
+        if not os.path.exists(directory):
+            print(f"Directory not found: {directory}")
+            return
+        
+        print(f"\nScanning directory: {directory}")
+        
+        # Find all .mp3 files without Spotify track IDs
+        files_to_rename = []
+        for filename in os.listdir(directory):
+            if filename.endswith('.mp3') and '{' not in filename:
+                files_to_rename.append(filename)
+        
+        if not files_to_rename:
+            print("No files found that need renaming.")
+            return
+        
+        print(f"Found {len(files_to_rename)} file(s) to process.\n")
+        
+        for index, filename in enumerate(files_to_rename, 1):
+            print(f"\n[{index}/{len(files_to_rename)}] Processing: {filename}")
+            self._process_file(directory, filename)
+    
+    def _process_file(self, directory: str, filename: str) -> None:
+        """Process a single file to add Spotify track ID.
+        
+        Args:
+            directory: Directory containing the file
+            filename: Name of the file to process
+        """
+        # Parse filename to extract artist and song
+        # Expected format: "Song Name - Artist Name.mp3"
+        match = re.match(r'^(.+?) - (.+?)\.mp3$', filename)
+        if not match:
+            print(f"  ⚠ Skipping: Could not parse filename format")
+            return
+        
+        song = match.group(1).strip()
+        artist = match.group(2).strip()
+        
+        print(f"  Song: {song}")
+        print(f"  Artist: {artist}")
+        
+        # Search for track on Spotify
+        track_info = self.spotify.search_track(artist, song)
+        
+        if not track_info:
+            print(f"  ✗ Track not found on Spotify")
+            return
+        
+        if 'spotify_track_id' not in track_info:
+            print(f"  ✗ No Spotify track ID found")
+            return
+        
+        spotify_track_id = track_info['spotify_track_id']
+        print(f"  ✓ Found Spotify ID: {spotify_track_id}")
+        
+        # Create new filename
+        new_filename = f"{song} - {artist} {{{spotify_track_id}}}.mp3"
+        
+        # Check if file with new name already exists
+        old_path = os.path.join(directory, filename)
+        new_path = os.path.join(directory, new_filename)
+        
+        if os.path.exists(new_path):
+            print(f"  ⚠ File already exists with new name, skipping")
+            return
+        
+        # Rename the file
+        try:
+            os.rename(old_path, new_path)
+            print(f"  ✓ Renamed to: {new_filename}")
+        except Exception as e:
+            print(f"  ✗ Error renaming file: {e}")

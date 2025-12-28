@@ -174,7 +174,7 @@ class SoundCloudSource(AudioSource):
             print(f"Error downloading progressive stream: {e}")
             return False
 
-    def download_track(self, url: str, artist: str, song: str, output_path: Optional[str] = None) -> Optional[str]:
+    def download_track(self, url: str, artist: str, song: str, output_path: Optional[str] = None, spotify_track_id: Optional[str] = None) -> Optional[str]:
         """Download a track from SoundCloud."""
         if output_path is None:
             output_path = self.downloads_dir
@@ -184,7 +184,10 @@ class SoundCloudSource(AudioSource):
             if not track_info:
                 raise Exception("Could not get track info")
 
-            output_filename = f"{song} - {artist}"
+            if spotify_track_id:
+                output_filename = f"{song} - {artist} {{{spotify_track_id}}}"
+            else:
+                output_filename = f"{song} - {artist}"
             output_filepath = os.path.join(output_path, output_filename)
             temp_file = f"{output_filepath}.mp3"
             

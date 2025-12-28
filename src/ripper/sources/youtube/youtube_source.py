@@ -58,14 +58,17 @@ class YouTubeSource(AudioSource):
             print(f"Search failed: {e}")
             return []
 
-    def download_track(self, url: str, artist: str, song: str, output_path: Optional[str] = None) -> Optional[str]:
+    def download_track(self, url: str, artist: str, song: str, output_path: Optional[str] = None, spotify_track_id: Optional[str] = None) -> Optional[str]:
         """Download audio from YouTube video."""
         try:
             if output_path is None:
                 output_path = self.downloads_dir
 
             # Create output filename
-            output_filename = f"{song} - {artist}"
+            if spotify_track_id:
+                output_filename = f"{song} - {artist} {{{spotify_track_id}}}"
+            else:
+                output_filename = f"{song} - {artist}"
             output_path = os.path.join(output_path, output_filename)
 
             # Basic yt-dlp options with ffmpeg path

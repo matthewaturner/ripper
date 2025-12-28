@@ -55,10 +55,10 @@ class AudioRipper:
             
         return results
 
-    def download_track(self, source: str, url: str, artist: str, song: str) -> Optional[str]:
+    def download_track(self, source: str, url: str, artist: str, song: str, spotify_track_id: Optional[str] = None) -> Optional[str]:
         """Download a track using the specified source."""
         try:
-            return self.get_source(source).download_track(url, artist, song)
+            return self.get_source(source).download_track(url, artist, song, spotify_track_id=spotify_track_id)
         except Exception as e:
             print(f"Error downloading from {source}: {e}")
             return None
