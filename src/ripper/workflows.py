@@ -349,3 +349,162 @@ class RenameFilesWorkflow:
             print(f"  ✓ Renamed to: {new_filename}")
         except Exception as e:
             print(f"  ✗ Error renaming file: {e}")
+
+
+class PlaylistImportWorkflow:
+    """Handles syncing a local directory with a Spotify playlist."""
+    
+    def __init__(self):
+        load_dotenv()
+        self.spotify = SpotifySource()
+    
+    def run(self, args: argparse.Namespace) -> None:
+        """Execute playlist import workflow.
+        
+        Args:
+            args: Parsed command line arguments with 'uri' and 'input_dir' attributes
+        """
+        if not args.uri:
+            print("Please provide a Spotify playlist URI (format: spotify:playlist:ID)")
+            return
+        
+        if not args.input_dir:
+            print("Please provide an input directory with --input-dir")
+            return
+        
+        input_dir = os.path.expanduser(args.input_dir)
+        if not os.path.exists(input_dir):
+            print(f"Directory not found: {input_dir}")
+            return
+        
+        print(f"\nFetching playlist information...")
+        playlist_info = self.spotify.get_playlist_info(args.uri)
+        if not playlist_info:
+            print("Failed to fetch playlist information")
+            return
+        
+        print(f"Playlist: {playlist_info['name']}")
+        print(f"Owner: {playlist_info['owner']}")
+        
+        print(f"\nFetching playlist tracks from Spotify...")
+        spotify_tracks = self.spotify.get_playlist_tracks(args.uri)
+        
+        if spotify_tracks is None:
+            print("Failed to fetch playlist tracks")
+            return
+        
+        # Build set of Spotify track IDs
+        spotify_track_ids = {track['spotify_track_id'] for track in spotify_tracks if 'spotify_track_id' in track}
+        print(f"Found {len(spotify_track_ids)} tracks in Spotify playlist")
+        
+        print(f"\nScanning directory: {input_dir}")
+        local_track_ids = self._scan_directory_for_track_ids(input_dir)
+        print(f"Found {len(local_track_ids)} tracks in local directory")
+        
+        # Calculate differences
+        tracks_to_add = local_track_ids - spotify_track_ids
+        tracks_to_remove = spotify_track_ids - local_track_ids
+        
+        # Display the diff
+        self._display_diff(tracks_to_add, tracks_to_remove)
+        
+        if not tracks_to_add and not tracks_to_remove:
+            print("\n✓ Playlist and directory are already in sync!")
+            return
+        
+        # Ask for confirmation
+        response = input("\nProceed with these changes? (y/n): ").strip().lower()
+        if response != 'y':
+            print("Operation cancelled")
+            return
+        
+        # Perform the sync
+        success = self._sync_playlist(args.uri, tracks_to_add, tracks_to_remove)
+        
+        if success:
+            print("\n✓ Playlist sync completed successfully!")
+        else:
+            print("\n✗ Playlist sync encountered errors")
+    
+    def _scan_directory_for_track_ids(self, directory: str) -> set:
+        """Scan directory for files with Spotify track IDs in their names.
+        
+        Args:
+            directory: Directory to scan
+            
+        Returns:
+            Set of Spotify track IDs found in filenames
+        """
+        track_ids = set()
+        
+        for filename in os.listdir(directory):
+            # Match pattern: "artist - song {spotify_track_id}.extension"
+            match = re.search(r'\{([a-zA-Z0-9]+)\}', filename)
+            if match:
+                track_id = match.group(1)
+                track_ids.add(track_id)
+        
+        return track_ids
+    
+    def _display_diff(self, tracks_to_add: set, tracks_to_remove: set) -> None:
+        """Display the difference between local directory and Spotify playlist.
+        
+        Args:
+            tracks_to_add: Track IDs to add to playlist
+            tracks_to_remove: Track IDs to remove from playlist
+        """
+        print("\n" + "="*60)
+        print("PLAYLIST SYNC PREVIEW")
+        print("="*60)
+        
+        if tracks_to_add:
+            print(f"\n✚ TRACKS TO ADD TO PLAYLIST ({len(tracks_to_add)}):")
+            for track_id in sorted(tracks_to_add):
+                track_info = self.spotify.get_track_by_id(track_id)
+                if track_info:
+                    print(f"  • {track_info['artist']} - {track_info['song']}")
+                else:
+                    print(f"  • [Unknown track: {track_id}]")
+        
+        if tracks_to_remove:
+            print(f"\n✖ TRACKS TO REMOVE FROM PLAYLIST ({len(tracks_to_remove)}):")
+            for track_id in sorted(tracks_to_remove):
+                track_info = self.spotify.get_track_by_id(track_id)
+                if track_info:
+                    print(f"  • {track_info['artist']} - {track_info['song']}")
+                else:
+                    print(f"  • [Unknown track: {track_id}]")
+        
+        print("\n" + "="*60)
+    
+    def _sync_playlist(self, playlist_uri: str, tracks_to_add: set, 
+                       tracks_to_remove: set) -> bool:
+        """Sync the playlist with the local directory.
+        
+        Args:
+            playlist_uri: Spotify playlist URI
+            tracks_to_add: Track IDs to add to playlist
+            tracks_to_remove: Track IDs to remove from playlist
+            
+        Returns:
+            True if all operations succeeded, False otherwise
+        """
+        success = True
+        
+        if tracks_to_remove:
+            print(f"\nRemoving {len(tracks_to_remove)} track(s) from playlist...")
+            if self.spotify.remove_tracks_from_playlist(playlist_uri, list(tracks_to_remove)):
+                print("✓ Successfully removed tracks")
+            else:
+                print("✗ Failed to remove some tracks")
+                success = False
+        
+        if tracks_to_add:
+            print(f"\nAdding {len(tracks_to_add)} track(s) to playlist...")
+            if self.spotify.add_tracks_to_playlist(playlist_uri, list(tracks_to_add)):
+                print("✓ Successfully added tracks")
+            else:
+                print("✗ Failed to add some tracks")
+                success = False
+        
+        return success

@@ -22,7 +22,7 @@ class SpotifySource:
             client_id=self.client_id,
             client_secret=self.client_secret,
             redirect_uri=self.redirect_uri,
-            scope='playlist-read-private'
+            scope='playlist-read-private playlist-modify-public playlist-modify-private'
         ))
 
     def get_playlist_tracks(self, playlist_uri: str) -> List[Dict]:
@@ -105,3 +105,111 @@ class SpotifySource:
         except Exception as e:
             print(f"Error searching track: {e}")
             return None
+
+    def get_track_by_id(self, track_id: str) -> Optional[Dict]:
+        """Get track information by Spotify track ID.
+        
+        Args:
+            track_id: Spotify track ID
+            
+        Returns:
+            Track information dictionary if found, None otherwise
+        """
+        try:
+            track = self.sp.track(track_id)
+            if track:
+                track_info = {
+                    'artist': track['artists'][0]['name'],
+                    'song': track['name'],
+                    'album': track['album']['name'],
+                    'year': track['album']['release_date'][:4],
+                    'duration': track['duration_ms'] // 1000,
+                    'spotify_track_id': track['id']
+                }
+                return format_track_info(track_info)
+            return None
+        except Exception as e:
+            print(f"Error fetching track by ID: {e}")
+            return None
+
+    def get_playlist_info(self, playlist_uri: str) -> Optional[Dict]:
+        """Get basic playlist information.
+        
+        Args:
+            playlist_uri: Spotify playlist URI (spotify:playlist:ID) or ID
+            
+        Returns:
+            Dictionary with playlist name and ID
+        """
+        try:
+            playlist_id = self._extract_playlist_id(playlist_uri)
+            playlist = self.sp.playlist(playlist_id, fields='name,id,owner')
+            return {
+                'name': playlist['name'],
+                'id': playlist['id'],
+                'owner': playlist['owner']['display_name']
+            }
+        except Exception as e:
+            print(f"Error fetching playlist info: {e}")
+            return None
+
+    def add_tracks_to_playlist(self, playlist_uri: str, track_ids: List[str]) -> bool:
+        """Add tracks to a Spotify playlist.
+        
+        Args:
+            playlist_uri: Spotify playlist URI (spotify:playlist:ID) or ID
+            track_ids: List of Spotify track IDs to add
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            playlist_id = self._extract_playlist_id(playlist_uri)
+            # Spotify API allows max 100 tracks per request
+            for i in range(0, len(track_ids), 100):
+                batch = track_ids[i:i + 100]
+                self.sp.playlist_add_items(playlist_id, batch)
+            return True
+        except Exception as e:
+            print(f"Error adding tracks to playlist: {e}")
+            return False
+
+    def remove_tracks_from_playlist(self, playlist_uri: str, track_ids: List[str]) -> bool:
+        """Remove tracks from a Spotify playlist.
+        
+        Args:
+            playlist_uri: Spotify playlist URI (spotify:playlist:ID) or ID
+            track_ids: List of Spotify track IDs to remove
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            playlist_id = self._extract_playlist_id(playlist_uri)
+            # Spotify API allows max 100 tracks per request
+            for i in range(0, len(track_ids), 100):
+                batch = track_ids[i:i + 100]
+                self.sp.playlist_remove_all_occurrences_of_items(playlist_id, batch)
+            return True
+        except Exception as e:
+            print(f"Error removing tracks from playlist: {e}")
+            return False
+
+    def _extract_playlist_id(self, playlist_uri: str) -> str:
+        """Extract playlist ID from URI, URL, or direct ID.
+        
+        Args:
+            playlist_uri: Spotify playlist URI, URL, or ID
+            
+        Returns:
+            Playlist ID
+        """
+        if playlist_uri.startswith('http'):
+            # Extract ID from URL
+            return playlist_uri.split('playlist/')[1].split('?')[0]
+        elif ':' in playlist_uri:
+            # Extract ID from URI
+            return playlist_uri.split(':')[-1]
+        else:
+            # Assume it's already an ID
+            return playlist_uri
