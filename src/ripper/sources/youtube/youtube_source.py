@@ -13,7 +13,7 @@ from ripper.config import DOWNLOADS_DIR
 class YouTubeSource(AudioSource):
     """YouTube implementation of AudioSource."""
     
-    def __init__(self):
+    def __init__(self, downloads_dir: Optional[str] = None):
         self.api_key = os.getenv('YOUTUBE_API_KEY')
         if not self.api_key:
             raise ValueError("YouTube API key not found in environment")
@@ -23,7 +23,7 @@ class YouTubeSource(AudioSource):
             raise ValueError("FFMPEG_PATH not found in environment")
         
         self.youtube = build('youtube', 'v3', developerKey=self.api_key)
-        self.downloads_dir = DOWNLOADS_DIR
+        self.downloads_dir = downloads_dir if downloads_dir else DOWNLOADS_DIR
 
     def search_tracks(self, query: str, max_results: int = 5) -> List[Dict]:
         """Search for YouTube videos matching query."""

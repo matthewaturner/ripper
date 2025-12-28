@@ -81,8 +81,9 @@ class SingleSongWorkflow:
 class PlaylistWorkflow:
     """Handles the workflow for downloading an entire playlist."""
     
-    def __init__(self):
-        self.ripper = AudioRipper()
+    def __init__(self, downloads_dir: Optional[str] = None):
+        self.ripper = AudioRipper(downloads_dir=downloads_dir)
+        self.downloads_dir = downloads_dir
     
     def run(self, args: argparse.Namespace) -> None:
         """Execute playlist download workflow.
@@ -128,7 +129,7 @@ class PlaylistWorkflow:
         print(f"Song: {track['song']}")
         
         # Check if file already exists
-        if file_exists(track['artist'], track['song']):
+        if file_exists(track['artist'], track['song'], self.downloads_dir):
             filename = f"{track['song']} - {track['artist']}.mp3"
             print(f"File already exists, skipping: {filename}")
             print("\n" + "-"*50)

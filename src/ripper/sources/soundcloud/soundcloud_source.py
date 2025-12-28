@@ -18,8 +18,8 @@ from ripper.config import DOWNLOADS_DIR
 class SoundCloudSource(AudioSource):
     """SoundCloud implementation for searching and downloading tracks."""
     
-    def __init__(self):
-        self.downloads_dir = DOWNLOADS_DIR
+    def __init__(self, downloads_dir: Optional[str] = None):
+        self.downloads_dir = downloads_dir if downloads_dir else DOWNLOADS_DIR
         self._client_id = None
         self._api = None
 

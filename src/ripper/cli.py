@@ -8,7 +8,10 @@ from ripper.workflows import SingleSongWorkflow, PlaylistWorkflow
 
 def main():
     """Main entry point for the audio ripper CLI."""
-    parser = argparse.ArgumentParser(description='Audio Ripper with multiple source support')
+    parser = argparse.ArgumentParser(
+        prog='ripper',
+        description='Audio Ripper with multiple source support'
+    )
     subparsers = parser.add_subparsers(dest='command', help='Commands')
     
     # Single song download
@@ -22,6 +25,7 @@ def main():
     playlist_parser.add_argument('--uri', required=True, help='Spotify playlist URI (spotify:playlist:ID)')
     playlist_parser.add_argument('--source', choices=['youtube', 'soundcloud'], 
                                 help='Preferred source (default: soundcloud)')
+    playlist_parser.add_argument('--output-dir', help='Directory to save downloaded files (default: ~/Downloads)')
     
     args = parser.parse_args()
     
@@ -30,7 +34,7 @@ def main():
         workflow = SingleSongWorkflow()
         workflow.run(args)
     elif args.command == 'playlist':
-        workflow = PlaylistWorkflow()
+        workflow = PlaylistWorkflow(downloads_dir=getattr(args, 'output_dir', None))
         workflow.run(args)
     else:
         parser.print_help()

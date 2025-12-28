@@ -10,7 +10,7 @@ from ripper.utils.formatting import format_track_info
 class SpotifySource:
     """Spotify source for fetching track information and playlists."""
     
-    def __init__(self):
+    def __init__(self, downloads_dir: Optional[str] = None):
         self.client_id = os.getenv('SPOTIFY_CLIENT_ID')
         self.client_secret = os.getenv('SPOTIFY_CLIENT_SECRET')
         self.redirect_uri = os.getenv('SPOTIFY_REDIRECT_URI')

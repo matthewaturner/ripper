@@ -12,7 +12,8 @@ __all__ = ['YouTubeSource', 'SpotifySource', 'SoundCloudSource', 'AudioRipper']
 class AudioRipper:
     """Main class for handling audio ripping from multiple sources."""
     
-    def __init__(self):
+    def __init__(self, downloads_dir: Optional[str] = None):
+        self.downloads_dir = downloads_dir
         self.source_classes = {
             'youtube': YouTubeSource,
             'soundcloud': SoundCloudSource,
@@ -29,7 +30,7 @@ class AudioRipper:
             # Load environment variables only when first source is initialized
             if not self.sources:
                 load_dotenv()
-            self.sources[source] = self.source_classes[source]()
+            self.sources[source] = self.source_classes[source](downloads_dir=self.downloads_dir)
             
         return self.sources[source]
 
