@@ -119,6 +119,10 @@ class PlaylistWorkflow:
             
             for i, track in enumerate(tracks, 1):
                 self._process_playlist_track(i, total_tracks, track, preferred_source)
+            
+            # Check for duplicates in the downloaded files
+            print("\n" + "="*50)
+            self._check_folder_duplicates()
                     
         except Exception as e:
             print(f"Error processing playlist: {e}")
@@ -166,6 +170,46 @@ class PlaylistWorkflow:
             print("\nContinuing with download...\n")
         
         return True
+    
+    def _check_folder_duplicates(self) -> None:
+        """Check for duplicate files in the downloads folder (ignoring Spotify IDs)."""
+        dir_path = self.downloads_dir if self.downloads_dir else DOWNLOADS_DIR
+        
+        if not os.path.exists(dir_path):
+            return
+        
+        # Build a map of base filenames (without Spotify ID) to actual filenames
+        file_map = {}
+        
+        for filename in os.listdir(dir_path):
+            if not filename.endswith('.mp3'):
+                continue
+            
+            # Strip out the Spotify ID portion {spotify_id} from the filename
+            # Format: "Song - Artist {spotify_id}.mp3" -> "Song - Artist.mp3"
+            base_name = re.sub(r'\s*\{[^}]+\}\.mp3$', '.mp3', filename)
+            
+            if base_name in file_map:
+                file_map[base_name].append(filename)
+            else:
+                file_map[base_name] = [filename]
+        
+        # Find duplicates
+        duplicates = {base: files for base, files in file_map.items() if len(files) > 1}
+        
+        if duplicates:
+            print("\n⚠️  WARNING: Found duplicate files in downloads folder!")
+            print("The following files have the same name (ignoring Spotify IDs):\n")
+            
+            for base_name, files in duplicates.items():
+                print(f"  Base name: {base_name}")
+                for file in files:
+                    print(f"    - {file}")
+                print()
+            
+            print("You may want to review and remove duplicates.")
+        else:
+            print("\n✓ No duplicate files found in downloads folder.")
     
     def _process_playlist_track(self, index: int, total: int, track: dict, 
                                 preferred_source: str) -> None:
