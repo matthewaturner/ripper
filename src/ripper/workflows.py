@@ -112,11 +112,60 @@ class PlaylistWorkflow:
             total_tracks = len(tracks)
             print(f"Found {total_tracks} tracks in playlist\n")
             
+            # Check for duplicate songs (same title by same artist)
+            if not self._check_duplicates(tracks):
+                print("\nPlaylist download cancelled.")
+                return
+            
             for i, track in enumerate(tracks, 1):
                 self._process_playlist_track(i, total_tracks, track, preferred_source)
                     
         except Exception as e:
             print(f"Error processing playlist: {e}")
+    
+    def _check_duplicates(self, tracks: list[dict]) -> bool:
+        """Check for duplicate songs (same title by same artist, case insensitive).
+        
+        Args:
+            tracks: List of track dictionaries from playlist
+            
+        Returns:
+            True if user wants to continue, False otherwise
+        """
+        # Build a dictionary to track songs by (artist, title) key (case insensitive)
+        song_map = {}
+        duplicates = []
+        
+        for track in tracks:
+            artist = track['artist'].lower()
+            song = track['song'].lower()
+            key = (artist, song)
+            
+            if key in song_map:
+                # Found a duplicate
+                duplicates.append({
+                    'artist': track['artist'],
+                    'song': track['song']
+                })
+            else:
+                song_map[key] = track
+        
+        if duplicates:
+            print("\n⚠️  WARNING: Found duplicate songs in playlist!")
+            print("The following songs have the same title and artist (may cause issues):\n")
+            
+            for dup in duplicates:
+                print(f"  • {dup['song']} - {dup['artist']}")
+            
+            print("\nIt may be best to fix these duplicates in your playlist first.")
+            response = input("Do you want to continue anyway? (y/n): ").strip().lower()
+            
+            if response != 'y' and response != 'yes':
+                return False
+            
+            print("\nContinuing with download...\n")
+        
+        return True
     
     def _process_playlist_track(self, index: int, total: int, track: dict, 
                                 preferred_source: str) -> None:
