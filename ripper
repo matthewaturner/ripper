@@ -1,0 +1,6 @@
+#!/bin/bash
+# Convenience script to run ripper with proper PYTHONPATH
+
+cd "$(dirname "$0")"
+source venv/bin/activate
+PYTHONPATH=src python3 -m ripper "$@"

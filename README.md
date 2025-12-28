@@ -56,31 +56,52 @@ Create a `.env` file with the following:
 
 ## Usage
 
+**Using the convenience script:**
+```bash
+# Interactive mode
+./ripper
+
+# With arguments
+./ripper song -a "Artist Name" -s "Song Name"
+
+# Playlist download
+./ripper playlist --uri spotify:playlist:37i9dQZF1DWWQRwui0ExPn
+```
+
+**Or using Python directly:**
+```bash
+# Activate venv and run as module
+source venv/bin/activate
+PYTHONPATH=src python3 -m ripper --help
+```
+
+**Command examples:**
+
 **Download a single song:**
 ```bash
 # Interactive mode
-python ripper.py
+./ripper
 
 # With arguments
-python ripper.py song -a "Artist Name" -s "Song Name"
+./ripper song -a "Artist Name" -s "Song Name"
 
 # Specify preferred source
-python ripper.py song -a "Artist Name" -s "Song Name" --source soundcloud
+./ripper song -a "Artist Name" -s "Song Name" --source soundcloud
 ```
 
 **Download a Spotify playlist:**
 ```bash
 # Using playlist URI
-python ripper.py playlist --uri spotify:playlist:37i9dQZF1DWWQRwui0ExPn
+./ripper playlist --uri spotify:playlist:37i9dQZF1DWWQRwui0ExPn
 
 # Using playlist URL
-python ripper.py playlist --uri https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn
+./ripper playlist --uri https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn
 
 # Using just the ID
-python ripper.py playlist --uri 37i9dQZF1DWWQRwui0ExPn
+./ripper playlist --uri 37i9dQZF1DWWQRwui0ExPn
 
 # Specify preferred source (default: soundcloud)
-python ripper.py playlist --uri 37i9dQZF1DWWQRwui0ExPn --source youtube
+./ripper playlist --uri 37i9dQZF1DWWQRwui0ExPn --source youtube
 ```
 
 Files are saved to your Downloads folder as `song - artist.m4a` or `song - artist.mp3`.

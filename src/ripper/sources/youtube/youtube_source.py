@@ -8,6 +8,7 @@ import yt_dlp
 from googleapiclient.discovery import build
 
 from ..base import AudioSource
+from ripper.config import DOWNLOADS_DIR
 
 class YouTubeSource(AudioSource):
     """YouTube implementation of AudioSource."""
@@ -22,7 +23,7 @@ class YouTubeSource(AudioSource):
             raise ValueError("FFMPEG_PATH not found in environment")
         
         self.youtube = build('youtube', 'v3', developerKey=self.api_key)
-        self.downloads_dir = str(Path.home() / "Downloads")
+        self.downloads_dir = DOWNLOADS_DIR
 
     def search_tracks(self, query: str, max_results: int = 5) -> List[Dict]:
         """Search for YouTube videos matching query."""

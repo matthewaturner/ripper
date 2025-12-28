@@ -5,7 +5,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
 from ..base import AudioSource
-from utils.formatting import format_track_info
+from ripper.utils.formatting import format_track_info
 
 class SpotifySource:
     """Spotify source for fetching track information and playlists."""

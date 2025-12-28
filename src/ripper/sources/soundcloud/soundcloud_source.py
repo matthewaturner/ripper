@@ -12,13 +12,14 @@ from urllib.parse import quote
 from mutagen.id3 import ID3, TIT2, TPE1
 
 from ..base import AudioSource
-from utils.formatting import format_track_info
+from ripper.utils.formatting import format_track_info
+from ripper.config import DOWNLOADS_DIR
 
 class SoundCloudSource(AudioSource):
     """SoundCloud implementation for searching and downloading tracks."""
     
     def __init__(self):
-        self.downloads_dir = str(Path.home() / "Downloads")
+        self.downloads_dir = DOWNLOADS_DIR
         self._client_id = None
         self._api = None
 
