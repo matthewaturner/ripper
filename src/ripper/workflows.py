@@ -455,17 +455,17 @@ class PlaylistImportWorkflow:
         """Execute playlist import workflow.
         
         Args:
-            args: Parsed command line arguments with 'uri' and 'input_dir' attributes
+            args: Parsed command line arguments with 'uri' and 'dir' attributes
         """
         if not args.uri:
             print("Please provide a Spotify playlist URI (format: spotify:playlist:ID)")
             return
         
-        if not args.input_dir:
-            print("Please provide an input directory with --input-dir")
+        if not args.dir:
+            print("Please provide an input directory with --dir")
             return
         
-        input_dir = os.path.expanduser(args.input_dir)
+        input_dir = os.path.expanduser(args.dir)
         if not os.path.exists(input_dir):
             print(f"Directory not found: {input_dir}")
             return
@@ -601,3 +601,139 @@ class PlaylistImportWorkflow:
                 success = False
         
         return success
+
+
+class RepairTrackWorkflow:
+    """Handles repairing/re-downloading a single track by filename."""
+    
+    def __init__(self, downloads_dir: Optional[str] = None):
+        load_dotenv()
+        self.downloads_dir = downloads_dir
+        self.ripper = AudioRipper(downloads_dir=downloads_dir)
+        self.spotify = SpotifySource()
+    
+    def run(self, args: argparse.Namespace) -> None:
+        """Execute repair workflow for a single track.
+        
+        Args:
+            args: Parsed command line arguments with 'filename' attribute
+        """
+        if not args.filename:
+            print("Please provide a filename to repair")
+            return
+        
+        filename = args.filename
+        
+        # Extract Spotify track ID from filename
+        # Format: "Song - Artist {spotify_id}.mp3"
+        match = re.search(r'\{([a-zA-Z0-9]+)\}', filename)
+        if not match:
+            print(f"Error: No Spotify track ID found in filename")
+            print(f"Expected format: 'Song - Artist {{spotify_id}}.mp3'")
+            print(f"The repair command requires a Spotify track ID to look up track metadata.")
+            return
+        
+        spotify_track_id = match.group(1)
+        
+        # Look up track metadata from Spotify
+        print(f"\nLooking up track on Spotify...")
+        print(f"  Spotify ID: {spotify_track_id}")
+        
+        track_info = self.spotify.get_track_by_id(spotify_track_id)
+        if not track_info:
+            print(f"Error: Could not find track on Spotify with ID: {spotify_track_id}")
+            return
+        
+        artist = track_info['artist']
+        song = track_info['song']
+        
+        print(f"\nRepairing track:")
+        print(f"  Artist: {artist}")
+        print(f"  Song: {song}")
+        print(f"  Spotify ID: {spotify_track_id}")
+        
+        # Determine file path
+        # If filename is a full path, use it directly
+        # Otherwise, construct path from downloads_dir and filename
+        if os.path.isabs(filename) or filename.startswith('~'):
+            file_path = os.path.expanduser(filename)
+            downloads_dir = os.path.dirname(file_path)
+            # Update the ripper to use this directory
+            self.ripper = AudioRipper(downloads_dir=downloads_dir)
+        else:
+            downloads_dir = getattr(args, 'dir', None) or self.downloads_dir or DOWNLOADS_DIR
+            file_path = os.path.join(downloads_dir, filename)
+            # Update the ripper to use this directory if different
+            if self.ripper.downloads_dir != downloads_dir:
+                self.ripper = AudioRipper(downloads_dir=downloads_dir)
+        
+        if not os.path.exists(file_path):
+            print(f"\nWarning: File not found at expected location:")
+            print(f"  {file_path}")
+            response = input("Continue with download anyway? (y/n): ").strip().lower()
+            if response != 'y':
+                print("Repair cancelled")
+                return
+        else:
+            print(f"\nFound existing file:")
+            print(f"  {file_path}")
+            response = input("This will be overwritten. Continue? (y/n): ").strip().lower()
+            if response != 'y':
+                print("Repair cancelled")
+                return
+        
+        # Search for the track
+        query = f"{artist} - {song}"
+        print(f"\nSearching for: {query}")
+        
+        preferred_source = getattr(args, 'source', None)
+        results = self.ripper.search_all_sources(query, preferred_source=preferred_source)
+        
+        if not results:
+            print("No results found in any source")
+            return
+        
+        # Always show results and let user choose (never auto-match)
+        print("\nPlease select the correct version to download:")
+        result_map = display_search_results(results)
+        
+        if len(result_map) == 0:
+            print("No results found in any source")
+            return
+        
+        choice = get_user_choice(len(result_map))
+        if choice is None:
+            print("Repair cancelled")
+            return
+        
+        # Get the chosen result and its source
+        source, selected_track = result_map[choice]
+        print(f"\nDownloading from {source.upper()}: {selected_track['title']}")
+        
+        # Delete existing file if it exists
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                print(f"Removed existing file: {file_path}")
+            except Exception as e:
+                print(f"Warning: Could not remove existing file: {e}")
+        
+        # Download and re-encode the track
+        output_file = self.ripper.download_track(
+            source, 
+            selected_track['url'], 
+            artist, 
+            song,
+            spotify_track_id=spotify_track_id
+        )
+        
+        if output_file:
+            print(f"\nDownload complete! File saved to: {output_file}")
+            print("Re-encoding file for compatibility...")
+            if reencode_mp3(output_file):
+                print("Re-encoding successful!")
+                print("\n✓ Track repair completed successfully!")
+            else:
+                print("Warning: Re-encoding failed, file may have compatibility issues")
+        else:
+            print("\nFailed to download audio")

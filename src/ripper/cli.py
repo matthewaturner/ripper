@@ -3,7 +3,7 @@
 """Audio Ripper CLI with support for multiple sources."""
 import argparse
 
-from ripper.workflows import SingleSongWorkflow, PlaylistWorkflow, RenameFilesWorkflow, PlaylistImportWorkflow
+from ripper.workflows import SingleSongWorkflow, PlaylistWorkflow, RenameFilesWorkflow, PlaylistImportWorkflow, RepairTrackWorkflow
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
     playlist_parser.add_argument('--uri', required=True, help='Spotify playlist URI (spotify:playlist:ID)')
     playlist_parser.add_argument('--source', choices=['youtube', 'soundcloud'], 
                                 help='Preferred source (default: soundcloud)')
-    playlist_parser.add_argument('--output-dir', help='Directory to save downloaded files (default: ~/Downloads)')
+    playlist_parser.add_argument('--dir', help='Directory to save downloaded files (default: ~/Downloads)')
     
     # Rename files to include Spotify track IDs
     rename_parser = subparsers.add_parser('rename', help='Rename existing files to include Spotify track IDs')
@@ -34,7 +34,13 @@ def main():
     # Playlist import - sync local directory with Spotify playlist
     import_parser = subparsers.add_parser('playlist-import', help='Sync Spotify playlist with local directory')
     import_parser.add_argument('--uri', required=True, help='Spotify playlist URI (spotify:playlist:ID)')
-    import_parser.add_argument('--input-dir', required=True, help='Directory containing local track files')
+    import_parser.add_argument('--dir', required=True, help='Directory containing local track files')
+    
+    # Repair - re-download a specific track by filename
+    repair_parser = subparsers.add_parser('repair', help='Repair/re-download a track by filename')
+    repair_parser.add_argument('filename', help='Filename to repair (must include Spotify ID: "Song - Artist {spotify_id}.mp3")')
+    repair_parser.add_argument('--source', choices=['youtube', 'soundcloud'], help='Preferred source')
+    repair_parser.add_argument('--dir', help='Directory containing the file (default: ~/Downloads)')
     
     args = parser.parse_args()
     
@@ -43,10 +49,13 @@ def main():
         workflow = SingleSongWorkflow()
         workflow.run(args)
     elif args.command == 'playlist':
-        workflow = PlaylistWorkflow(downloads_dir=getattr(args, 'output_dir', None))
+        workflow = PlaylistWorkflow(downloads_dir=getattr(args, 'dir', None))
         workflow.run(args)
     elif args.command == 'rename':
         workflow = RenameFilesWorkflow()
+        workflow.run(args)
+    elif args.command == 'repair':
+        workflow = RepairTrackWorkflow()
         workflow.run(args)
     elif args.command == 'playlist-import':
         workflow = PlaylistImportWorkflow()
