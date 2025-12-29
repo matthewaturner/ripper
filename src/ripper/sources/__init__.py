@@ -43,15 +43,26 @@ class AudioRipper:
             return []
 
     def search_all_sources(self, query: str, max_results: int = 5, preferred_source: Optional[str] = None) -> Dict[str, List[Dict]]:
-        """Search across available sources, prioritizing preferred source."""
+        """Search across available sources, prioritizing preferred source.
+        
+        If preferred_source is specified, only search that source.
+        Otherwise, search all sources (except Spotify which is for playlists only).
+        """
         results = {}
         
-        # Search all sources (except Spotify which is for playlists only)
-        for source in self.source_classes:
-            if source != 'spotify':  # Skip Spotify as it's for playlists only
-                source_results = self.search_source(source, query, max_results)
+        # If preferred source is specified, only search that source
+        if preferred_source:
+            if preferred_source != 'spotify':
+                source_results = self.search_source(preferred_source, query, max_results)
                 if source_results:
-                    results[source] = source_results
+                    results[preferred_source] = source_results
+        else:
+            # Search all sources (except Spotify which is for playlists only)
+            for source in self.source_classes:
+                if source != 'spotify':  # Skip Spotify as it's for playlists only
+                    source_results = self.search_source(source, query, max_results)
+                    if source_results:
+                        results[source] = source_results
             
         return results
 
