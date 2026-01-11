@@ -45,24 +45,26 @@ class AudioRipper:
     def search_all_sources(self, query: str, max_results: int = 5, preferred_source: Optional[str] = None) -> Dict[str, List[Dict]]:
         """Search across available sources, prioritizing preferred source.
         
-        If preferred_source is specified, only search that source.
-        Otherwise, search all sources (except Spotify which is for playlists only).
+        All sources are searched (except Spotify which is for playlists only).
+        Results are ordered with preferred_source first if specified.
         """
         results = {}
         
-        # If preferred source is specified, only search that source
-        if preferred_source:
-            if preferred_source != 'spotify':
-                source_results = self.search_source(preferred_source, query, max_results)
+        # Search all sources (except Spotify which is for playlists only)
+        for source in self.source_classes:
+            if source != 'spotify':  # Skip Spotify as it's for playlists only
+                source_results = self.search_source(source, query, max_results)
                 if source_results:
-                    results[preferred_source] = source_results
-        else:
-            # Search all sources (except Spotify which is for playlists only)
-            for source in self.source_classes:
-                if source != 'spotify':  # Skip Spotify as it's for playlists only
-                    source_results = self.search_source(source, query, max_results)
-                    if source_results:
-                        results[source] = source_results
+                    results[source] = source_results
+        
+        # If preferred source is specified and has results, ensure it's first
+        if preferred_source and preferred_source in results:
+            # Reorder dict to put preferred source first
+            reordered = {preferred_source: results[preferred_source]}
+            for source, source_results in results.items():
+                if source != preferred_source:
+                    reordered[source] = source_results
+            results = reordered
             
         return results
 

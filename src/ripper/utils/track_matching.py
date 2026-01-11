@@ -69,23 +69,42 @@ def parse_duration(duration: str) -> int:
 
 def clean_title(title: str) -> str:
     """Clean up a title for comparison."""
-    # Remove common additions like "(Official Video)", "[HD]", etc.
-    patterns = [
-        r'\([^)]*\)',  # Anything in ()
-        r'\[[^\]]*\]',  # Anything in []
-        r'official\s*(video|audio|music|hd|lyric|lyrics)',
-        r'lyrics\s*video',
-        r'audio\s*only',
-        r'full\s*album',
-        r'official\s*release',
-        r'explicit',
-        r'original\s*mix',
-        r'hq',
-        r'hd',
+    title = title.lower()
+    
+    # Remove specific unwanted content in parentheses/brackets, but keep important music info
+    # like "extended mix", "radio edit", "remix", "feat", etc.
+    unwanted_patterns = [
+        r'\(official\s*(video|audio|music|lyric|lyrics)\)',
+        r'\[official\s*(video|audio|music|lyric|lyrics)\]',
+        r'\(lyrics?\s*video\)',
+        r'\[lyrics?\s*video\]',
+        r'\(audio\s*only\)',
+        r'\[audio\s*only\]',
+        r'\(hd\)',
+        r'\[hd\]',
+        r'\(hq\)',
+        r'\[hq\]',
+        r'\(explicit\)',
+        r'\[explicit\]',
+        r'\(full\s*album\)',
+        r'\[full\s*album\]',
+        r'\(official\s*release\)',
+        r'\[official\s*release\]',
     ]
     
-    title = title.lower()
-    for pattern in patterns:
+    for pattern in unwanted_patterns:
+        title = re.sub(pattern, '', title, flags=re.IGNORECASE)
+    
+    # Remove standalone keywords that aren't in brackets/parens
+    standalone_patterns = [
+        r'\bofficial\s*(video|audio|music|hd|lyric|lyrics)\b',
+        r'\blyrics?\s*video\b',
+        r'\baudio\s*only\b',
+        r'\bfull\s*album\b',
+        r'\bofficial\s*release\b',
+    ]
+    
+    for pattern in standalone_patterns:
         title = re.sub(pattern, '', title, flags=re.IGNORECASE)
     
     return " ".join(title.split())  # Normalize whitespace
@@ -102,27 +121,31 @@ def score_match(spotify_data: Dict, result: Dict, source: str) -> float:
         Score between 0 and 1, higher is better
     """
     score = 0.0
-    max_score = 4.0  # Total of all scoring components
+    max_score = 5.0  # Total of all scoring components
     
-    # 1. Duration match (max 1 point)
-    # Allow 3 seconds difference for perfect match, scale down to 10 seconds
+    # 1. Duration match (max 2 points - MOST IMPORTANT)
+    # Exact match (≤3 seconds) gets full 2 points, scale down to 15 seconds
     spotify_duration = parse_duration(spotify_data['duration'])
     result_duration = parse_duration(result['duration'])
     duration_diff = abs(spotify_duration - result_duration)
     if duration_diff <= 3:
-        score += 1.0
-    elif duration_diff <= 10:
-        score += 1.0 - ((duration_diff - 3) / 7)
+        score += 2.0
+    elif duration_diff <= 15:
+        score += 2.0 - ((duration_diff - 3) / 12) * 2.0
     
-    # 2. Title match (max 1 point)
+    # 2. Title match (max 1 point - fuzzy matching)
     # Clean up titles for better matching
     spotify_title = clean_title(spotify_data['song'])
     result_title = clean_title(result['title'])
     
-    title_ratio = similarity_ratio(spotify_title, result_title) / 100
+    # Use partial matching for more forgiving comparison
+    title_ratio = max(
+        similarity_ratio(spotify_title, result_title) / 100,
+        partial_similarity_ratio(spotify_title, result_title) / 100
+    )
     score += title_ratio
     
-    # 3. Artist match (max 1 point)
+    # 3. Artist match (max 1.5 points)
     spotify_artist = spotify_data['artist'].lower()
     
     if source == 'youtube':
@@ -133,18 +156,18 @@ def score_match(spotify_data: Dict, result: Dict, source: str) -> float:
         # Also check if artist appears in title
         title_artist_ratio = partial_similarity_ratio(spotify_artist, result_title) / 100
         # Use the better of the two scores
-        score += max(channel_ratio, title_artist_ratio)
+        score += max(channel_ratio, title_artist_ratio) * 1.5
     else:  # SoundCloud
         result_artist = result['artist'].lower()
         artist_ratio = similarity_ratio(spotify_artist, result_artist) / 100
-        score += artist_ratio
+        score += artist_ratio * 1.5
     
-    # 4. Additional source-specific scoring (max 1 point)
+    # 4. Additional source-specific scoring (max 0.5 point)
     if source == 'youtube':
         # Prefer videos with more views (logarithmic scale)
         try:
             views = int(result['views'])
-            view_score = min(1.0, views / 1000000)  # Max at 1M views
+            view_score = min(0.5, views / 2000000)  # Max at 2M views
             score += view_score
         except (ValueError, KeyError, TypeError):
             pass
@@ -152,7 +175,7 @@ def score_match(spotify_data: Dict, result: Dict, source: str) -> float:
         # Prefer tracks with more likes
         try:
             likes = int(result['likes'])
-            like_score = min(1.0, likes / 10000)  # Max at 10K likes
+            like_score = min(0.5, likes / 20000)  # Max at 20K likes
             score += like_score
         except (ValueError, KeyError, TypeError):
             pass
@@ -160,12 +183,12 @@ def score_match(spotify_data: Dict, result: Dict, source: str) -> float:
         # Bonus for genre match if available
         if result.get('genre') and spotify_data.get('genre'):
             if result['genre'].lower() == spotify_data['genre'].lower():
-                score += 0.2  # Small bonus
+                score += 0.1  # Small bonus
 
     # Normalize score to 0-1 range
     return score / max_score
 
-def find_best_match(spotify_data: Dict, results: List[Dict], source: str, threshold: float = 0.7) -> Optional[Dict]:
+def find_best_match(spotify_data: Dict, results: List[Dict], source: str, threshold: float = 0.65) -> Optional[Dict]:
     """Find the best matching track from search results.
     
     Args:
