@@ -616,17 +616,18 @@ class RepairTrackWorkflow:
         """Execute repair workflow for a single track.
         
         Args:
-            args: Parsed command line arguments with 'filename' attribute
+            args: Parsed command line arguments with 'filepath' attribute
         """
-        if not args.filename:
-            print("Please provide a filename to repair")
+        if not args.filepath:
+            print("Please provide a file path to repair")
             return
         
-        filename = args.filename
+        # Convert to absolute path (handles relative paths like ./file.mp3)
+        filepath = os.path.abspath(os.path.expanduser(args.filepath))
         
-        # Extract Spotify track ID from filename
+        # Extract Spotify track ID from filepath
         # Format: "Song - Artist {spotify_id}.mp3"
-        match = re.search(r'\{([a-zA-Z0-9]+)\}', filename)
+        match = re.search(r'\{([a-zA-Z0-9]+)\}', filepath)
         if not match:
             print(f"Error: No Spotify track ID found in filename")
             print(f"Expected format: 'Song - Artist {{spotify_id}}.mp3'")
@@ -652,31 +653,22 @@ class RepairTrackWorkflow:
         print(f"  Song: {song}")
         print(f"  Spotify ID: {spotify_track_id}")
         
-        # Determine file path
-        # If filename is a full path, use it directly
-        # Otherwise, construct path from downloads_dir and filename
-        if os.path.isabs(filename) or filename.startswith('~'):
-            file_path = os.path.expanduser(filename)
-            downloads_dir = os.path.dirname(file_path)
-            # Update the ripper to use this directory
-            self.ripper = AudioRipper(downloads_dir=downloads_dir)
-        else:
-            downloads_dir = getattr(args, 'dir', None) or self.downloads_dir or DOWNLOADS_DIR
-            file_path = os.path.join(downloads_dir, filename)
-            # Update the ripper to use this directory if different
-            if self.ripper.downloads_dir != downloads_dir:
-                self.ripper = AudioRipper(downloads_dir=downloads_dir)
+        # Get directory from the filepath and update ripper
+        downloads_dir = os.path.dirname(filepath)
+        if not downloads_dir:
+            downloads_dir = os.getcwd()
+        self.ripper = AudioRipper(downloads_dir=downloads_dir)
         
-        if not os.path.exists(file_path):
+        if not os.path.exists(filepath):
             print(f"\nWarning: File not found at expected location:")
-            print(f"  {file_path}")
+            print(f"  {filepath}")
             response = input("Continue with download anyway? (y/n): ").strip().lower()
             if response != 'y':
                 print("Repair cancelled")
                 return
         else:
             print(f"\nFound existing file:")
-            print(f"  {file_path}")
+            print(f"  {filepath}")
             response = input("This will be overwritten. Continue? (y/n): ").strip().lower()
             if response != 'y':
                 print("Repair cancelled")
@@ -711,10 +703,10 @@ class RepairTrackWorkflow:
         print(f"\nDownloading from {source.upper()}: {selected_track['title']}")
         
         # Delete existing file if it exists
-        if os.path.exists(file_path):
+        if os.path.exists(filepath):
             try:
-                os.remove(file_path)
-                print(f"Removed existing file: {file_path}")
+                os.remove(filepath)
+                print(f"Removed existing file: {filepath}")
             except Exception as e:
                 print(f"Warning: Could not remove existing file: {e}")
         

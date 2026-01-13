@@ -36,11 +36,10 @@ def main():
     import_parser.add_argument('--uri', required=True, help='Spotify playlist URI (spotify:playlist:ID)')
     import_parser.add_argument('--dir', required=True, help='Directory containing local track files')
     
-    # Repair - re-download a specific track by filename
-    repair_parser = subparsers.add_parser('repair', help='Repair/re-download a track by filename')
-    repair_parser.add_argument('filename', help='Filename to repair (must include Spotify ID: "Song - Artist {spotify_id}.mp3")')
+    # Repair - re-download a specific track by file path
+    repair_parser = subparsers.add_parser('repair', help='Repair/re-download a track by file path')
+    repair_parser.add_argument('filepath', help='Full path to file to repair (must include Spotify ID: "Song - Artist {spotify_id}.mp3")')
     repair_parser.add_argument('--source', choices=['youtube', 'soundcloud'], help='Preferred source')
-    repair_parser.add_argument('--dir', help='Directory containing the file (default: ~/Downloads)')
     
     args = parser.parse_args()
     

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ripper"
+version = "0.1.0"
+description = "Audio Ripper with multiple source support"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "yt-dlp",
+    "spotipy",
+    "soundcloud-lib",
+    "python-dotenv",
+]
+
+[project.scripts]
+ripper = "ripper.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
