@@ -1,13 +1,18 @@
 Metadata-Version: 2.4
 Name: ripper
-Version: 0.1.0
+Version: 0.1.1
 Summary: Audio Ripper with multiple source support
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
-Requires-Dist: yt-dlp
-Requires-Dist: spotipy
-Requires-Dist: soundcloud-lib
-Requires-Dist: python-dotenv
+Requires-Dist: yt-dlp[default]>=2025.12.8
+Requires-Dist: google-api-python-client==2.91.0
+Requires-Dist: python-dotenv==1.0.0
+Requires-Dist: spotipy==2.23.0
+Requires-Dist: soundcloud-lib==0.6.1
+Requires-Dist: requests<3,>=2.32.2
+Requires-Dist: eyed3==0.9.7
+Requires-Dist: m3u8==3.5.0
+Requires-Dist: isodate==0.6.1
 
 # Audio Ripper
 

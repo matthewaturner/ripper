@@ -3,7 +3,6 @@ import argparse
 import os
 import re
 from typing import Optional
-from dotenv import load_dotenv
 
 from ripper.sources import AudioRipper
 from ripper.sources.spotify.spotify_source import SpotifySource
@@ -393,7 +392,6 @@ class RenameFilesWorkflow:
     """Handles renaming existing files to include Spotify track IDs."""
     
     def __init__(self):
-        load_dotenv()
         self.spotify = SpotifySource()
     
     def run(self, args: argparse.Namespace) -> None:
@@ -483,7 +481,6 @@ class PlaylistImportWorkflow:
     """Handles syncing a local directory with a Spotify playlist."""
     
     def __init__(self):
-        load_dotenv()
         self.spotify = SpotifySource()
     
     def run(self, args: argparse.Namespace) -> None:
@@ -642,7 +639,6 @@ class RepairTrackWorkflow:
     """Handles repairing/re-downloading a single track by filename."""
     
     def __init__(self, downloads_dir: Optional[str] = None):
-        load_dotenv()
         self.downloads_dir = downloads_dir
         self.ripper = AudioRipper(downloads_dir=downloads_dir)
         self.spotify = SpotifySource()

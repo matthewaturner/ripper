@@ -1,6 +1,5 @@
 """Sources package for audio download sources."""
 from typing import List, Dict, Optional
-from dotenv import load_dotenv
 
 from .youtube.youtube_source import YouTubeSource
 from .spotify.spotify_source import SpotifySource
@@ -27,9 +26,6 @@ class AudioRipper:
             raise ValueError(f"Unknown source: {source}")
             
         if source not in self.sources:
-            # Load environment variables only when first source is initialized
-            if not self.sources:
-                load_dotenv()
             self.sources[source] = self.source_classes[source](downloads_dir=self.downloads_dir)
             
         return self.sources[source]

@@ -1,62 +1,24 @@
-# Ripper Skill
+---
+name: Ripper CLI
+description: CLI capable of downloading audio files from youtube or soundcloud.
+---
 
-Short guide to use the `ripper` CLI and integrate this repository as a skill.
+# Ripper CLI
 
-**Purpose:**
-- **Skill:** Expose `ripper` as a system CLI and document installation and usage for automation or other agents.
-
-**Install (development)**:
-- From the repository root, install editable for local development:
-
-```bash
-pip install --editable .
 ```
+usage: ripper [-h] {song,playlist,rename,playlist-import,repair} ...
 
-After this, the `ripper` command will be available in your active Python environment.
+Audio Ripper with multiple source support
 
-**Install (recommended for system-wide use)**:
-- Use `pipx` to install the package in an isolated environment:
+positional arguments:
+  {song,playlist,rename,playlist-import,repair}
+                        Commands
+    song                Download a single song
+    playlist            Download all songs from a Spotify playlist
+    rename              Rename existing files to include Spotify track IDs
+    playlist-import     Sync Spotify playlist with local directory
+    repair              Repair/re-download a track by file path
 
-```bash
-pipx install .
+options:
+  -h, --help            show this help message and exit
 ```
-
-Or build and install a wheel:
-
-```bash
-python -m build
-pip install dist/ripper-*.whl
-```
-
-**Run without installing**:
-- Run directly as a module from the project root:
-
-```bash
-python -m ripper --help
-```
-
-**Basic usage examples:**
-- Download a single song (preferring YouTube):
-
-```bash
-ripper song -a "Artist Name" -s "Song Title" --source youtube
-```
-
-- Download a Spotify playlist to a directory:
-
-```bash
-ripper playlist --uri spotify:playlist:YOUR_PLAYLIST_ID --dir ~/Music/Ripper
-```
-
-- Rename files to include Spotify IDs:
-
-```bash
-ripper rename --directory ~/Downloads
-```
-
-**Notes for integrators / agents:**
-- The console script is already declared in `pyproject.toml` as `ripper = "ripper.cli:main"`.
-- For CI or automation, prefer `pipx install .` or install the wheel to ensure the `ripper` entry point is available.
-
-**Further work:**
-- Add packaging metadata (classifiers, long description) if publishing to PyPI.

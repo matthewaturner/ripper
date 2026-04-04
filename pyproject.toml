@@ -4,15 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ripper"
-version = "0.1.0"
+version = "0.1.1"
 description = "Audio Ripper with multiple source support"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-    "yt-dlp",
-    "spotipy",
-    "soundcloud-lib",
-    "python-dotenv",
+    "yt-dlp[default]>=2025.12.8",
+    "google-api-python-client==2.91.0",
+    "python-dotenv==1.0.0",
+    "spotipy==2.23.0",
+    "soundcloud-lib==0.6.1",
+    "requests>=2.32.2,<3",
+    "eyed3==0.9.7",
+    "m3u8==3.5.0",
+    "isodate==0.6.1",
 ]
 
 [project.scripts]
