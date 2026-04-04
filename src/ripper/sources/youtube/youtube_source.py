@@ -9,6 +9,7 @@ from googleapiclient.discovery import build
 
 from ..base import AudioSource
 from ripper.config import DOWNLOADS_DIR
+from ripper.file_manager import sanitize_filename
 
 class YouTubeSource(AudioSource):
     """YouTube implementation of AudioSource."""
@@ -66,19 +67,28 @@ class YouTubeSource(AudioSource):
 
             # Create output filename
             if spotify_track_id:
-                output_filename = f"{song} - {artist} {{{spotify_track_id}}}"
+                output_filename = f"{sanitize_filename(song)} - {sanitize_filename(artist)} {{{spotify_track_id}}}"
             else:
-                output_filename = f"{song} - {artist}"
+                output_filename = f"{sanitize_filename(song)} - {sanitize_filename(artist)}"
             output_path = os.path.join(output_path, output_filename)
 
-            # Basic yt-dlp options with ffmpeg path
+            # yt-dlp options with ffmpeg path
             ydl_opts = {
-                'format': 'bestaudio',
+                'format': 'bestaudio/best',
                 'outtmpl': f'{output_path}.%(ext)s',
                 'ffmpeg_location': self.ffmpeg_path,
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                },
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['web', 'android', 'tv'],
+                    },
+                },
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
+                    'preferredquality': '320',  # 320 kbps for high quality
                 }]
             }
 

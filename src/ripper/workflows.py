@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 
 from ripper.sources import AudioRipper
 from ripper.sources.spotify.spotify_source import SpotifySource
-from ripper.audio_processing import reencode_mp3
-from ripper.file_manager import file_exists, get_expected_filepath
+from ripper.audio_processing import reencode_mp3, detect_audio_format, check_rekordbox_compatible
+from ripper.file_manager import file_exists, get_expected_filepath, sanitize_filename
 from ripper.ui import display_search_results, display_spotify_track_info, get_user_choice
 from ripper.utils.track_matching import find_best_match
 from ripper.config import DEFAULT_PLAYLIST_SOURCE, DOWNLOADS_DIR
@@ -17,8 +17,9 @@ from ripper.config import DEFAULT_PLAYLIST_SOURCE, DOWNLOADS_DIR
 class SingleSongWorkflow:
     """Handles the workflow for downloading a single song."""
     
-    def __init__(self):
+    def __init__(self, force_reencode: bool = False):
         self.ripper = AudioRipper()
+        self.force_reencode = force_reencode
     
     def run(self, args: argparse.Namespace) -> None:
         """Execute single song download workflow.
@@ -73,11 +74,29 @@ class SingleSongWorkflow:
         
         if output_file:
             print(f"\nDownload complete! File saved to: {output_file}")
-            print("Re-encoding file for compatibility...")
-            if reencode_mp3(output_file):
-                print("Re-encoding successful!")
+            
+            # Check if re-encoding is needed
+            if self.force_reencode:
+                print("Force re-encoding enabled...")
+                if reencode_mp3(output_file):
+                    print("✓ Re-encoding successful!")
+                else:
+                    print("Warning: Re-encoding failed, file may have compatibility issues")
             else:
-                print("Warning: Re-encoding failed, file may have compatibility issues")
+                format_info = detect_audio_format(output_file)
+                is_compatible, reason = check_rekordbox_compatible(format_info)
+                
+                if is_compatible:
+                    print("✓ File is already rekordbox-compatible, skipping re-encoding")
+                    if format_info:
+                        bitrate_display = f"{format_info['bitrate'] // 1000}kbps" if format_info['bitrate'] > 0 else "unknown"
+                        print(f"  Format: {format_info['codec'].upper()} @ {bitrate_display}")
+                else:
+                    print(f"Re-encoding needed: {reason}")
+                    if reencode_mp3(output_file):
+                        print("✓ Re-encoding successful!")
+                    else:
+                        print("Warning: Re-encoding failed, file may have compatibility issues")
         else:
             print("\nFailed to download audio")
 
@@ -85,9 +104,10 @@ class SingleSongWorkflow:
 class PlaylistWorkflow:
     """Handles the workflow for downloading an entire playlist."""
     
-    def __init__(self, downloads_dir: Optional[str] = None):
+    def __init__(self, downloads_dir: Optional[str] = None, force_reencode: bool = False):
         self.ripper = AudioRipper(downloads_dir=downloads_dir)
         self.downloads_dir = downloads_dir
+        self.force_reencode = force_reencode
     
     def run(self, args: argparse.Namespace) -> None:
         """Execute playlist download workflow.
@@ -263,11 +283,26 @@ class PlaylistWorkflow:
         
         if output_file:
             print(f"Downloaded to: {output_file}")
-            print("Re-encoding file for compatibility...")
-            if reencode_mp3(output_file):
-                print("Re-encoding successful!")
+            
+            # Check if re-encoding is needed
+            if self.force_reencode:
+                print("Force re-encoding...")
+                if reencode_mp3(output_file):
+                    print("✓ Re-encoding successful!")
+                else:
+                    print("Warning: Re-encoding failed")
             else:
-                print("Warning: Re-encoding failed, file may have compatibility issues")
+                format_info = detect_audio_format(output_file)
+                is_compatible, reason = check_rekordbox_compatible(format_info)
+                
+                if is_compatible:
+                    print("✓ Already compatible, skipping re-encoding")
+                else:
+                    print(f"Re-encoding needed: {reason}")
+                    if reencode_mp3(output_file):
+                        print("✓ Re-encoding successful!")
+                    else:
+                        print("Warning: Re-encoding failed")
         else:
             print("Download failed, skipping...")
         
@@ -426,7 +461,7 @@ class RenameFilesWorkflow:
         print(f"  ✓ Found Spotify ID: {spotify_track_id}")
         
         # Create new filename
-        new_filename = f"{song} - {artist} {{{spotify_track_id}}}.mp3"
+        new_filename = f"{sanitize_filename(song)} - {sanitize_filename(artist)} {{{spotify_track_id}}}.mp3"
         
         # Check if file with new name already exists
         old_path = os.path.join(directory, filename)
@@ -721,11 +756,23 @@ class RepairTrackWorkflow:
         
         if output_file:
             print(f"\nDownload complete! File saved to: {output_file}")
-            print("Re-encoding file for compatibility...")
-            if reencode_mp3(output_file):
-                print("Re-encoding successful!")
+            
+            # Check if re-encoding is needed
+            format_info = detect_audio_format(output_file)
+            is_compatible, reason = check_rekordbox_compatible(format_info)
+            
+            if is_compatible:
+                print("✓ File is already rekordbox-compatible, skipping re-encoding")
+                if format_info:
+                    bitrate_display = f"{format_info['bitrate'] // 1000}kbps" if format_info['bitrate'] > 0 else "unknown"
+                    print(f"  Format: {format_info['codec'].upper()} @ {bitrate_display}")
                 print("\n✓ Track repair completed successfully!")
             else:
-                print("Warning: Re-encoding failed, file may have compatibility issues")
+                print(f"Re-encoding needed: {reason}")
+                if reencode_mp3(output_file):
+                    print("✓ Re-encoding successful!")
+                    print("\n✓ Track repair completed successfully!")
+                else:
+                    print("Warning: Re-encoding failed, file may have compatibility issues")
         else:
             print("\nFailed to download audio")

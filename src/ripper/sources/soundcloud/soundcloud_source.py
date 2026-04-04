@@ -14,6 +14,7 @@ from mutagen.id3 import ID3, TIT2, TPE1
 from ..base import AudioSource
 from ripper.utils.formatting import format_track_info
 from ripper.config import DOWNLOADS_DIR
+from ripper.file_manager import sanitize_filename
 
 class SoundCloudSource(AudioSource):
     """SoundCloud implementation for searching and downloading tracks."""
@@ -185,9 +186,9 @@ class SoundCloudSource(AudioSource):
                 raise Exception("Could not get track info")
 
             if spotify_track_id:
-                output_filename = f"{song} - {artist} {{{spotify_track_id}}}"
+                output_filename = f"{sanitize_filename(song)} - {sanitize_filename(artist)} {{{spotify_track_id}}}"
             else:
-                output_filename = f"{song} - {artist}"
+                output_filename = f"{sanitize_filename(song)} - {sanitize_filename(artist)}"
             output_filepath = os.path.join(output_path, output_filename)
             temp_file = f"{output_filepath}.mp3"
             

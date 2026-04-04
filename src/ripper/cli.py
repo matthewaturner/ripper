@@ -19,6 +19,8 @@ def main():
     song_parser.add_argument('-a', '--artist', help='Artist name')
     song_parser.add_argument('-s', '--song', help='Song name')
     song_parser.add_argument('--source', choices=['youtube', 'soundcloud'], help='Preferred source')
+    song_parser.add_argument('--force-reencode', action='store_true', 
+                           help='Force re-encoding even if file is already compatible')
     
     # Playlist download
     playlist_parser = subparsers.add_parser('playlist', help='Download all songs from a Spotify playlist')
@@ -26,6 +28,8 @@ def main():
     playlist_parser.add_argument('--source', choices=['youtube', 'soundcloud'], 
                                 help='Preferred source (default: soundcloud)')
     playlist_parser.add_argument('--dir', help='Directory to save downloaded files (default: ~/Downloads)')
+    playlist_parser.add_argument('--force-reencode', action='store_true',
+                               help='Force re-encoding even if files are already compatible')
     
     # Rename files to include Spotify track IDs
     rename_parser = subparsers.add_parser('rename', help='Rename existing files to include Spotify track IDs')
@@ -45,10 +49,13 @@ def main():
     
     # Route to appropriate workflow
     if not args.command or args.command == 'song':
-        workflow = SingleSongWorkflow()
+        workflow = SingleSongWorkflow(force_reencode=getattr(args, 'force_reencode', False))
         workflow.run(args)
     elif args.command == 'playlist':
-        workflow = PlaylistWorkflow(downloads_dir=getattr(args, 'dir', None))
+        workflow = PlaylistWorkflow(
+            downloads_dir=getattr(args, 'dir', None),
+            force_reencode=getattr(args, 'force_reencode', False)
+        )
         workflow.run(args)
     elif args.command == 'rename':
         workflow = RenameFilesWorkflow()
